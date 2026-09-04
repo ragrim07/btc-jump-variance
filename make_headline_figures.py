@@ -102,7 +102,7 @@ def fig1_finding():
                     bbox=dict(boxstyle="round,pad=0.45", fc="#eef5ee",
                               ec=C_MOD, lw=1.0))
 
-    fig.suptitle("Bitcoin jumps cluster — the standard model says they cannot",
+    fig.suptitle("Bitcoin jumps cluster, the standard model says they cannot",
                  color=INK, fontsize=13, x=0.006, ha="left", y=1.005)
     fig.text(0.006, 0.945,
              "Constant-intensity jump-diffusion predicts both curves are identically zero "
@@ -210,7 +210,7 @@ def fig3_honest_limit():
              color=INK, fontsize=13.5, ha="left", va="top")
     fig.text(0.008, 0.905,
              "The bottom row holds the premium rich, so any variation across it must come from the jump state.\n"
-             f"In sample the row is ordered ({tr_row['low']:+.2f} → {tr_row['mid']:+.2f} → {tr_row['high']:+.2f}) — "
+             f"In sample the row is ordered ({tr_row['low']:+.2f} → {tr_row['mid']:+.2f} → {tr_row['high']:+.2f}), "
              f"rich premium plus a hot jump state compresses hardest.\n"
              f"Out of sample the ordering breaks ({ho_row['low']:+.2f} → {ho_row['mid']:+.2f} → {ho_row['high']:+.2f}), "
              "and the only cell favouring the effect holds 8 observations.",

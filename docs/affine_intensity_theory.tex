@@ -2,8 +2,8 @@
 
 % ---------------------------------------------------------------------------
 % AFFINE JUMP INTENSITY FOR THE TODOROV TWO-FACTOR VOLATILITY MODEL
-% A self-contained mathematical development, written as the implementation
-% contract for the Step-A' extension of this repository.
+% Working notes: deriving the affine-intensity extension and the moments the
+% GMM estimator needs.
 %
 % Compile with pdflatex (twice, for TOC and references).
 % ---------------------------------------------------------------------------
@@ -24,7 +24,7 @@
 \newtheorem{example}[theorem]{Example}
 \theoremstyle{remark}
 \newtheorem{remark}[theorem]{Remark}
-\newtheorem{impact}[theorem]{Project impact}
+\newtheorem{impact}[theorem]{Remark}
 
 \newcommand{\E}{\mathbb{E}}
 \newcommand{\Var}{\operatorname{Var}}
@@ -46,34 +46,34 @@
 \newcommand{\mkh}{m_{kh^{2}}}
 
 \title{\textbf{Affine Jump Intensity for the Two-Factor\\ Stochastic Volatility Model}\\[1ex]
-\large A complete mathematical development: from point-process foundations\\
-to GMM moments, filtering, and variance-risk-premium analysis}
-\author{Trading / Todorov SDE \& Volatility Calibration project}
-\date{July 2026 --- Step A$'$ implementation contract}
+\large From point processes to the GMM moments, the filter, and the\\
+variance risk premium}
+\author{Agrim}
+\date{July 2026}
 
 \begin{document}
 \maketitle
 
 \begin{abstract}
 \noindent
-The Step-A calibration of the Todorov (2010) two-factor model was rejected by
-three held-out diagnostics: the realized jump-variance series $\JV_t$ is
-strongly serially correlated (the model demands independence), the
-cross-autocovariance between $\TPV_t$ and $\JV_t$ is two-sided (the model
-demands strict one-sidedness), and the jump feed-through persists for about a
-week (the calibrated decay dies in hours). All three failures share one cause:
-the model's jumps arrive at \emph{constant} intensity. This document develops,
-from first principles, the minimal repair: an \emph{affine stochastic
-intensity} $\lambda(t)=\lambda_{0}+\lambda_{1}\Vj(t^{-})$, which makes the jump
-process self-exciting while preserving closed-form moments. We build the
-point-process machinery from scratch, prove why the affine class is the unique
-tractable choice, establish the equivalence with an exponential-kernel marked
-Hawkes process, derive every population moment the GMM estimator needs using
-Dynkin's formula over fixed time intervals, analyze identification, and trace
-the consequences through every layer of the project: estimation, the
-latent-state filter, variance-risk-premium construction, regime
-classification, and the simulation harness that must verify the algebra before
-any estimation is run.
+I fit the Todorov (2010) two-factor model to Bitcoin and three diagnostics I had
+held back rejected it. Realized jump variance $\JV_t$ is serially correlated
+when the model says it cannot be; the cross-autocovariance between $\TPV_t$ and
+$\JV_t$ runs in both directions when the model allows only one; and jump
+feed-through lasts about a week when the calibrated decay kills it in hours.
+
+All three trace to the same assumption, that jumps arrive at a \emph{constant}
+rate. These notes work out the smallest change that fixes it: let the intensity
+be affine in the jump-variance state, $\lambda(t)=\lambda_{0}+\lambda_{1}\Vj(t^{-})$,
+so each jump makes the next one more likely. Affinity is what keeps the moments
+in closed form, and that is the only reason the estimator stays tractable.
+
+I start from point processes and compensators, show that the affine class is the
+tractability boundary, identify the specification with an exponential-kernel
+marked Hawkes process, and derive the population moments the GMM estimator needs
+using Dynkin's formula on fixed intervals. From there: identification, the
+latent-state filter, the variance risk premium, and the simulator I need to
+check the algebra against before running anything on real data.
 \end{abstract}
 
 \tableofcontents
@@ -143,10 +143,9 @@ Chapter~\ref{ch:impl} specifies simulation, verification, and the concrete
 changes to \texttt{test.py}. Appendices collect derivatives for the analytic
 Jacobian, useful integrals, notation, and an implementation checklist.
 
-\paragraph{Mathematical house rules.} Per the project's estimation protocol,
-all derivations proceed through \emph{Dynkin's formula evaluated over a fixed
-global time interval}. We never shrink a time step to zero as a derivation
-device and we never invoke the adjoint (forward/Fokker--Planck) operator.
+\paragraph{How the derivations run.} Throughout, I work through \emph{Dynkin's formula evaluated over a fixed
+global time interval}. I never shrink a time step to zero as a derivation device, and never reach
+for the adjoint (forward/Fokker--Planck) operator.
 Stationary moments follow from the fixed-interval identity
 $\E\!\int_{0}^{T}\!\A f(X_{s})\dd s = \E f(X_{T})-\E f(X_{0}) = 0$;
 conditional moments follow from the same identity read as a Volterra integral
@@ -319,7 +318,7 @@ $\deg\lambda=d$ it is degree $n+d-1$.
 \end{proof}
 
 \begin{impact}
-Proposition~\ref{prop:closure} is why the whole project works. Moment
+Proposition~\ref{prop:closure} is what makes the rest possible. Moment
 derivations reduce (Chapter~\ref{ch:moments}) to computing $\E[\A f]$ for
 polynomial $f$. Under affinity, the $n$-th moment equation involves only
 moments of order $\le n$: a finite, triangular linear system --- closed
@@ -327,9 +326,8 @@ form, hence an analytic GMM Jacobian, hence stable optimization. Under a
 quadratic intensity, the second-moment equation would involve the third
 moment, the third the fourth, ad infinitum: no closed form, forcing
 simulation-based estimation (orders of magnitude slower, noisy gradients,
-no analytic Jacobian --- the exact failure modes the project's coding
-standards prohibit). Affinity is not a stylistic choice; it is the boundary
-between ``rederive formulas in an afternoon'' and ``rebuild the estimator.''
+no analytic Jacobian). So affinity is not cosmetic: it is the difference
+between rederiving a formula in an afternoon and rebuilding the estimator.
 \end{impact}
 
 \section{Equivalence with a marked Hawkes process}
@@ -477,7 +475,7 @@ cascade relaxes, slowed by the factor $(1-\eta)$ because decaying excitation
 keeps being replenished by offspring jumps. The data constrains
 $\kappa_{j}$ (through every autocovariance and cross-covariance decay), while
 $b$ appears separately only through the mean level $\bar v=\bar\lambda\mk/b$.
-The Step-A transience mandate (``jump factor half-life under 2 days'')
+The Step-A transience requirement (``jump factor half-life under 2 days'')
 properly applies to $b$; the persistence the diagnostics revealed lives in
 $\kappa_{j}$. Both can now be honored at once.
 \end{remark}
@@ -802,14 +800,14 @@ $\rho_{j}=-b$.
 
 \paragraph{Bounds.} All of
 $\sigma_{c}^{2},\bar V^{c},A,B,\psi,c,S$ strictly positive; $\kappa_{c}$
-in its persistence band as mandated. Two structural constraints deserve
+in its persistence band as before. Two structural constraints deserve
 emphasis:
 \begin{itemize}
 \item \textbf{Stationarity is free.} $\eta<1\iff\kappa_{j}>0$: by
 parametrizing with $\kappa_{j}$ directly, subcriticality is enforced by a
 simple positivity bound --- no nonlinear constraint needed. This is a real
 design win of the composite parametrization.
-\item \textbf{The old transience mandate moves to $b$.} ``Jump factor
+\item \textbf{The old transience requirement moves to $b$.} ``Jump factor
 half-life $<2$ days'' constrains $b=\kappa_{j}+\psi c\ge\ln 2/2$, a
 \emph{linear} inequality in $(\kappa_{j},\psi,c)$-space (impose via
 \texttt{scipy.optimize} linear constraint or check-and-report). $\kappa_{j}$
@@ -976,8 +974,8 @@ everything in Chapter~\ref{ch:vrp}. Their quality ceiling is set by the
 covariances \eqref{eq:sigmaxy}; those are trustworthy only if the moment
 formulas behind them survived (i) simulation verification
 (Chapter~\ref{ch:impl}) and (ii) the over-identification tests of
-Chapter~\ref{ch:gmm}. This dependency chain is why estimation rigor comes
-before any VRP claim.
+Chapter~\ref{ch:gmm}. That chain is why I want the estimation nailed down before making any claim
+about the VRP.
 \end{impact}
 
 % ===========================================================================
@@ -1074,14 +1072,13 @@ uncertainty measure; spikes flag transitions.
 \end{itemize}
 
 \begin{impact}
-Deliverables enabled by this chapter, in order: the VRP time series
+What this chapter makes possible, in order: the VRP time series
 \eqref{eq:vrpaffine} on real data (needs the DVOL leg); regime-shaded charts
 of VRP and jump share; the $\hat\eta$ criticality dial with CIs; an event
 study around 2025-10-10 (VRP spike and decay at rate $\kappa_{j}$ ---
 a directly testable model prediction: the post-event decay slope in the
 data \emph{should} match the GMM-estimated $\kappa_{j}$; verifying it on
-an event not targeted by any moment is the strongest single validation
-this project can produce).
+an event no moment was fitted to is the strongest check available here).
 \end{impact}
 
 % ===========================================================================
@@ -1111,7 +1108,7 @@ children with ages $\sim\mathrm{Exp}(b)$; stop when a generation is empty
 (a.s.\ finite by $\eta<1$). Statistically identical output, independent code
 path --- ideal for catching bugs in either.
 
-\section{The verification protocol (non-negotiable)}
+\section{The verification protocol}
 
 Before the first GMM run on real data:
 \begin{enumerate}

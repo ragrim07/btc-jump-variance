@@ -3,16 +3,16 @@ Simulation verification of the P-measure GMM estimator (the capstone).
 
 Three experiments, all on data simulated from KNOWN theta' (simulate.py):
 
-  1. MOMENT VERIFICATION -- checks the MATH.  For each parameter set, compare the
+  1. Moment verification -- checks the MATH.  For each parameter set, compare the
      40 analytic moments to their simulated batch-means estimates; z-scores must
      lie inside +-3.  (A sign error in Theorem 5.3 shared with its Jacobian would
      pass selfcheck.py but fail here.)
 
-  2. ESTIMATOR RECOVERY -- checks the PIPELINE.  Run the full analytic-Jacobian
+  2. Estimator recovery -- checks the PIPELINE.  Run the full analytic-Jacobian
      GMM on each simulated series; report theta_hat vs theta_true and a moving-
      block-bootstrap 95% CI, flag whether the truth is covered.  Headline: eta.
 
-  3. COVERAGE CALIBRATION -- checks the CIs.  Repeatedly simulate independent
+  3. Coverage calibration -- checks the CIs.  Repeatedly simulate independent
      datasets from one parameter set, estimate + CI each, and report the fraction
      of 95% CIs that actually contain the truth (should be ~0.95).
 

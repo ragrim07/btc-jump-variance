@@ -3,11 +3,11 @@ Ex-ante variance risk premium from the calibrated P-measure model.
 
     VRP_t  =  E^Q_t[QV_{t,t+30}]  -  E^P_t[QV_{t,t+30}]
 
-BOTH LEGS ARE KNOWN AT TIME t. No future realized variance enters the signal, so
+Both legs are known at time t. No future realized variance enters the signal, so
 VRP_t is a genuine tradeable quantity, not an ex-post accounting identity.
 
-Q leg. Deribit DVOL is a 30-day model-free implied volatility in ANNUALISED
-VOL POINTS. Our realized measures are in percent^2 per day, so
+Q leg. Deribit DVOL is a 30-day model-free implied volatility in annualised
+vol points. Our realized measures are in percent^2 per day, so
     E^Q_t[QV]/day = DVOL_t^2 / 365 .
 
 P leg (eq. 8.1 of the theory doc), with tau = 30 days and
@@ -16,7 +16,7 @@ tau_tilde(a) = (1 - e^{-a*tau})/a:
                         + (V^c_t - Vbar_c) tau_tilde(kappa_c)
                         + (1 + psi)(V^j_t - vbar) tau_tilde(kappa_j)
 Divide by tau for a per-day figure. The (1+psi) loading is the point of the
-extension: an elevated jump state raises future variance TWICE -- through its own
+extension: an elevated jump state raises future variance twice: through its own
 decay and through the extra jumps it will trigger.
 
 States. We do not need the full LMMSE projection: the SDE already tells us what
@@ -26,12 +26,12 @@ and V^c is recovered as a smoothed (MedRV - V^j), smoothing at the CIR rate
 kappa_c because that is the persistence V^c actually has. Transparent and derived
 from the model, not a black box.
 
-PARAMETERS COME FROM THE TRAIN WINDOW ONLY (2023-01..2025-06). Everything from
+Parameters come from the train window only (2023-01 to 2025-06). Everything from
 2025-07 onward is therefore an out-of-sample application.
 
-KNOWN BIAS, STATED UP FRONT. The event study showed the model under-predicts
+One known bias, up front. The event study showed the model under-predicts
 post-shock persistence (observed half-life ~9.5 d vs predicted 2.4 d). So after
-big jumps the P leg is too LOW and VRP is biased HIGH. We quantify this by also
+big jumps the P leg is too low and the VRP is biased high. We quantify this by also
 running a purely empirical HAR benchmark for the P leg.
 """
 
@@ -286,14 +286,14 @@ def main():
     ax.annotate("parameters estimated ← | → out of sample", (train_end, ax.get_ylim()[1]*0.8),
                 xytext=(6, 0), textcoords="offset points", color=MUTED, fontsize=8)
     ax.set_ylabel("VRP (%$^2$/day)", color=INK, fontsize=9)
-    ax.set_title(f"Ex-ante variance risk premium — positive {100*(df.VRP>0).mean():.0f}% of days "
+    ax.set_title(f"Ex-ante variance risk premium, positive {100*(df.VRP>0).mean():.0f}% of days "
                  f"(green = market overpays for variance)", color=INK, fontsize=10.5, loc="left")
 
     ax = axes[2]
     ax.plot(df.index, df.jump_share, color=C_LO, lw=1.0)
     ax.set_ylabel("jump share $V^j/(V^c{+}V^j)$", color=INK, fontsize=9)
     ax.set_xlabel("date", color=INK, fontsize=9)
-    ax.set_title("Jump share of total variance — the state that conditions the trade",
+    ax.set_title("Jump share of total variance, the state that conditions the trade",
                  color=INK, fontsize=10.5, loc="left")
 
     fig.tight_layout()

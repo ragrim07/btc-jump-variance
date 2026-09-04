@@ -1,17 +1,17 @@
 """
-Does the jump-variance state V^j predict COMPRESSIONS in the variance risk premium?
+Does the jump-variance state V^j predict compressions in the variance risk premium?
 
 This is the question the whole project was built to answer: the model exists to
 extract V^j (the self-exciting jump-variance state) from high-frequency data, so
 the payoff has to be that V^j tells you something about where the premium is
 going that simpler quantities do not.
 
-DESIGN. Every test below controls for the two things that would otherwise
+Design. Every test below controls for the two things that would otherwise
 manufacture a result:
   (a) the premium's own mean reversion  -- high VRP falls regardless of V^j;
   (b) the mechanical channel -- the model's P leg is an explicit function of the
       states, so any state "predicts" a model-based VRP by construction. We
-      therefore report the effect on the PURE MARKET quote Q = DVOL^2/365 and on
+      therefore report the effect on the pure market quote Q = DVOL^2/365 and on
       the HAR-based VRP (whose P leg contains no model states) alongside the
       model VRP.
 
@@ -19,7 +19,7 @@ Tests, in order of how hard they are to fool:
   1. Regression robustness across horizons and subsamples.
   2. Monotonicity across V^j quintiles (an effect that is real should be ordered,
      not concentrated in one bucket).
-  3. Double sort: VRP level x V^j -- does V^j add anything WITHIN a level bucket?
+  3. Double sort: VRP level x V^j -- does V^j add anything within a level bucket?
   4. Compression probability: P(large VRP drop | high V^j) vs unconditional.
   5. Out-of-sample: rule formed on train only, evaluated on the holdout.
   6. Economic magnitude, not just significance.
@@ -83,7 +83,7 @@ def main():
               f"{100*(s.dVRP<0).mean():10.1f}% {s.VRP.mean():13.3f}")
     print("    (a genuine effect should be ORDERED across quintiles, not one bucket)")
 
-    # ---- 3. double sort: does V^j add WITHIN a VRP level bucket? --------
+    # ---- 3. double sort: does V^j add within a VRP level bucket? --------
     print("\n[3] DOUBLE SORT: mean subsequent dVRP by (VRP level tercile x V^j tercile)")
     d["lv"] = pd.qcut(d.VRP, 3, labels=["VRP low", "VRP mid", "VRP high"])
     d["vj3"] = pd.qcut(d.zVj, 3, labels=["Vj low", "Vj mid", "Vj high"])

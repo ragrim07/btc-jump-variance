@@ -6,7 +6,7 @@ Two identities are implied by the theory:
   (I)   C_J * S = C_B * C_F
   (II)  S = c^2 B / (2 kappa_j)
 
-CRITICAL DISTINCTION.
+An important distinction.
   Inside the structural parametrisation theta' = [.., A, B, psi, c, S], the
   coefficients are DEFINED as
         C_F = cB + psi S,   C_B = psi S,   C_J = psi (psi S + cB) = psi C_F.

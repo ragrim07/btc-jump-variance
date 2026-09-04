@@ -5,14 +5,14 @@ Prints the latest jump state, variance risk premium, and which cell of the
 (premium level x jump state) grid we sit in -- the grid whose in-sample pattern
 is the project's central result.
 
-HONESTY ABOUT STALENESS. The Q leg (Deribit DVOL) is fetched live and is current
+On staleness. The Q leg (Deribit DVOL) is fetched live and is current
 to today. The P leg needs daily realized measures, which are built from the
 1-minute bar file; that file ends whenever the tick data ends. This script
 reports the age of the realized data explicitly rather than pretending the whole
 readout is live. To refresh the P leg you need new tick data, then:
     python clean_prices.py && python realized_measures.py
 
-INTERPRETATION WARNING. The grid's historical pattern is an IN-SAMPLE result that
+One caveat. The grid's historical pattern is an in-sample result that
 did not replicate on held-out data. This readout says where we are, not what will
 happen.
 """
@@ -106,7 +106,7 @@ def main(refresh_dvol=True):
         print(f"  historically (in sample, n={len(cell)}): mean 10-day change "
               f"{cell.mean():+.3f}")
     print("=" * w)
-    print("  NOTE: the grid pattern is an IN-SAMPLE result that did NOT replicate")
+    print("  NOTE: the grid pattern is an in-sample result that did NOT replicate")
     print("  on held-out data. This is a state readout, not a forecast.")
     print("=" * w)
 

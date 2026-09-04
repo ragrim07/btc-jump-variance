@@ -82,7 +82,7 @@ def ledoit_wolf_cov(X, target="diagonal"):
     target='diagonal' (default): Sigma_hat = rho*diag(S) + (1-rho)*S.
     target='identity'          : Sigma_hat = rho*mu*I  + (1-rho)*S  (classic LW).
 
-    WHY THE DIAGONAL TARGET IS THE RIGHT ONE HERE. The classic Ledoit-Wolf
+    Why the diagonal target is the right one here. The classic Ledoit-Wolf
     identity target assumes all coordinates share a scale. Our 40 moment
     conditions do not: on real BTC data Var(TPV) ~ 47 while the JV
     autocovariances are ~ 0.03 -- five orders of magnitude in variance. Shrinking
@@ -249,7 +249,7 @@ def moving_block_bootstrap(rows, theta_hat, W, n_boot=300, block=40, seed=0):
 
     Critical detail: we resample blocks of the per-day contribution rows h_t
     (returned by empirical_moments_ext) and average them to form each bootstrap
-    moment vector -- we do NOT re-slice the raw (TPV,JV) series and recompute
+    moment vector -- we do not re-slice the raw (TPV,JV) series and recompute
     autocovariances. Each h_t already carries its lag products dt_t*dt_{t-k}
     computed on the original contiguous data, so blocks of rows preserve the
     serial dependence; recomputing autocovariances on concatenated raw blocks

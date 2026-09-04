@@ -5,12 +5,12 @@ Three independent checks, each catching a different class of error:
 
   GATE A  damping limits    -- f,g,ghat match their a->0 and a->inf expansions.
   GATE B  lambda1 = 0 collapse -- at psi=0 the 40-moment engine reproduces an
-          INDEPENDENTLY hand-coded Step-A moment set to machine precision, and
+          independently hand-coded Step-A moment set to machine precision, and
           the self-excitation-only blocks (JV-acov, backward cross) vanish.
   GATE C  analytic Jacobian -- D matches central finite differences at random
           interior points to < 1e-6 relative error.
 
-Gates A/B/C verify that the CODE matches the MATH. They cannot verify that the
+Gates A/B/C verify that the code matches the math. They cannot verify that the
 math itself (Theorem 5.3) is correct -- that is the job of the simulation phase,
 where population moments are checked against an exact Monte-Carlo generator.
 """
@@ -45,7 +45,7 @@ def gate_a_damping(tol_small=1e-4, tol_large=1e-3):
 
 # --------------------------------------------------------------------------
 def _stepA_reference(theta):
-    """Independent Step-A moment formulas at psi=0 (NOT reusing moments.py).
+    """Independent Step-A moment formulas at psi=0 (not reusing moments.py).
 
     At psi=0: b=kappa_j, eta=0, C_J=C_B=0, C_F=cB. Returns the 20 Step-A-shared
     moments in the same slots as the extended vector's first 20 entries plus the

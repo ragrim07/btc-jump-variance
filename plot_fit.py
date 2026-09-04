@@ -111,17 +111,17 @@ def main():
         _style(ax)
 
     _panel(axes[0, 0], k_tpv, m_emp[s_tpv], se[s_tpv], m_fit[s_tpv],
-           "TPV autocovariance — the two-factor decay",
+           "TPV autocovariance, the two-factor decay",
            "lag k (days)", r"Cov(TPV$_t$, TPV$_{t-k}$)", xticks=k_tpv[::2])
 
     _panel(axes[0, 1], k_jv, m_emp[s_jv], se[s_jv], m_fit[s_jv],
-           "JV autocovariance — jump clustering",
+           "JV autocovariance, jump clustering",
            "lag k (days)", r"Cov(JV$_t$, JV$_{t-k}$)",
            zero_label="old model: exactly 0 ∀k", xticks=k_jv)
 
     _panel(axes[1, 0], kx, ce, cs, cm,
            "TPV–JV cross-autocovariance (two-sided)",
-           r"lag k   —   Cov(TPV$_t$, JV$_{t-k}$)", "cross-autocovariance",
+           r"lag k  ,   Cov(TPV$_t$, JV$_{t-k}$)", "cross-autocovariance",
            xticks=kx)
     axes[1, 0].annotate("variance leads jumps\n(old model: 0)", xy=(-3.4, 0.72),
                         color=MUTED, fontsize=7.6, ha="center")
@@ -138,7 +138,7 @@ def main():
     ax.axhline(0, color=AXIS, lw=0.8)
     ax.bar(np.arange(40), z, color=colors, width=0.72, edgecolor=SURFACE, linewidth=0.4)
     ax.set_ylim(-3.2, 3.2)
-    ax.set_title("Standardized fit residuals — only 2 of 40 exceed ±2",
+    ax.set_title("Standardized fit residuals, only 2 of 40 exceed ±2",
                  color=INK, fontsize=10.5, loc="left", pad=8)
     ax.set_xlabel("moment (levels · TPV-acov · JV-acov · cross-fwd · cross-bwd)",
                   color=INK, fontsize=8.8)
@@ -165,7 +165,7 @@ def main():
                                 "old model: exactly 0 ∀k", k_jv),
         "fig_fit_cross.png": (kx, ce, cs, cm,
                               "TPV–JV cross-autocovariance (two-sided)",
-                              r"lag k   —   Cov(TPV$_t$, JV$_{t-k}$)",
+                              r"lag k  ,   Cov(TPV$_t$, JV$_{t-k}$)",
                               "cross-autocovariance", None, kx),
     }.items():
         fig, ax = plt.subplots(figsize=(8.8, 4.9), dpi=150)

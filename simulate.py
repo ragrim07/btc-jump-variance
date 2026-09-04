@@ -1,7 +1,7 @@
 """
 Exact simulator for the affine-intensity model M' (Chapter 9).
 
-Produces daily (TPV, JV) whose law is EXACTLY the model's -- no discretization
+Produces daily (TPV, JV) whose law is exactly the model's -- no discretization
 of the jump dynamics, so any gap between the simulated moments and the analytic
 formulas of moments.py is a bug, not scheme bias.
 
@@ -14,7 +14,7 @@ Three independent pieces, assembled per day:
   V^j (jumps) Ogata thinning: between jumps V^j decays at the microscopic rate
               b, so lambda(t)=lambda0+lambda1 V^j(t^-) is monotone decreasing and
               its post-jump value is an exact ceiling. The daily integral
-              Int V^j ds is accumulated ANALYTICALLY between events
+              Int V^j ds is accumulated analytically between events
               (Int_a^b v0 e^{-b(s-a)} ds = v0 (1-e^{-b(b-a)})/b), split at day
               boundaries -- exact, no quadrature.
 
@@ -23,9 +23,9 @@ Three independent pieces, assembled per day:
               m_h=1 gauge) and E[w^2]=m_hh=B/A. Each jump adds w to JV and c*w to
               V^j (the translation gauge k=c h^2 couples them: the co-jump).
 
-The variance S=Var(V^j) is NOT an input -- it emerges from the dynamics and
+The variance S=Var(V^j) is not an input -- it emerges from the dynamics and
 equals c^2 B/(2 kappa_j) automatically (the structural identity). Test points
-must therefore be chosen ON that manifold (see make_theta).
+must therefore be chosen on that manifold (see make_theta).
 """
 
 import numpy as np

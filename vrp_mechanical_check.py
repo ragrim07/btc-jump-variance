@@ -1,18 +1,18 @@
 """
 Is the "V^c predicts VRP changes" result real, or mechanical?
 
-THE CONCERN. The model's P leg is an explicit linear function of the states:
+The concern. The model's P leg is an explicit linear function of the states:
     P_t = level + (V^c_t - Vbar_c) taut(kc) + (1+psi)(V^j_t - vbar) taut(kj)
 so  dVRP = dQ - dP = dQ - taut(kc) dV^c - (1+psi) taut(kj) dV^j.
 V^c mean-reverts, so a HIGH V^c today implies dV^c < 0, hence dP < 0, hence
 dVRP > 0 -- a POSITIVE coefficient on V^c arises with no economic content
 whatsoever. That is precisely the sign found earlier, so it must be decomposed.
 
-FOUR REGRESSIONS, run at each horizon (all regressors standardised, HAC lags):
+Four regressions, run at each horizon (all regressors standardised, HAC lags):
   1. d VRP_model  on [VRP_model, V^c, V^j]   -- the original result
   2. d VRP_har    on [VRP_har,   V^c, V^j]   -- P leg from a HAR forecast that
                                                does not contain the states
-  3. d Q          on [Q,         V^c, V^j]   -- PURE MARKET DATA, no model output
+  3. d Q          on [Q,         V^c, V^j]   -- pure market data, no model output
                                                anywhere: the clean test
   4. d P_model    on [V^c, V^j]              -- isolates the mechanical channel
 Regression 3 is decisive: Q is the options market's own quote, so nothing the

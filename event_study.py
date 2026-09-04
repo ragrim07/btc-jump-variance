@@ -1,18 +1,18 @@
 """
 Out-of-sample event study on the HOLDOUT window (2025-07 .. 2026-06).
 
-THE TEST. kappa_j was estimated on the TRAIN window (2023-01 .. 2025-06) from
+The test. kappa_j was estimated on the TRAIN window (2023-01 .. 2025-06) from
 unconditional moments. Every event below lies in the holdout, which the estimator
 never saw. The model makes a sharp conditional prediction:
 
-    a price jump kicks the jump-variance state V^j (it does NOT touch the
+    a price jump kicks the jump-variance state V^j (it does not touch the
     Brownian-driven continuous factor V^c), so the post-event EXCESS variance is
     pure V^j excess and must decay at the effective rate kappa_j.
 
 Comparing the observed post-event decay to the train-estimated kappa_hat_j is
 therefore a genuine out-of-sample structural prediction.
 
-THREE DESIGN POINTS THAT MATTER.
+Three things that matter in the design.
  1. Fit from day +1, not day 0. The shock ARRIVES on day 0; day 0's variance is
     the shock itself, not the state it leaves behind. Including it makes the fit
     measure the shock's own size, not the decay.
@@ -25,9 +25,9 @@ THREE DESIGN POINTS THAT MATTER.
     0.000 -- it reports "no jumps" on the largest crash in the sample. MedRV
     gives 5.700.
 
-P VERSUS Q. kappa_j is a physical-measure object; DVOL is risk-neutral. The
+On P versus Q. kappa_j is a physical-measure object; DVOL is risk-neutral. The
 change of measure rescales the self-excitation, so kappa_j^Q != kappa_j^P in
-general. The DVOL decay is NOT a second test of kappa_hat_j -- the WEDGE between
+general. The DVOL decay is not a second test of kappa_hat_j; the wedge between
 the two is the economic result (how jump-risk persistence is priced).
 """
 
@@ -223,7 +223,7 @@ def main():
     ax.set_ylabel("normalised excess implied variance (log)", color=INK, fontsize=9)
     ax.legend(frameon=False, fontsize=7.6, labelcolor=INK, loc="lower left")
 
-    fig.suptitle("Out-of-sample event study — these events were never in the estimation window",
+    fig.suptitle("Out-of-sample event study, these events were never in the estimation window",
                  color=INK, fontsize=12, x=0.006, ha="left", y=1.0)
     fig.tight_layout(rect=[0, 0, 1, 0.965])
     fig.savefig("fig_event_study.png", facecolor=SURFACE, bbox_inches="tight")
