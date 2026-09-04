@@ -1,0 +1,1273 @@
+\documentclass[11pt]{report}
+
+% ---------------------------------------------------------------------------
+% AFFINE JUMP INTENSITY FOR THE TODOROV TWO-FACTOR VOLATILITY MODEL
+% A self-contained mathematical development, written as the implementation
+% contract for the Step-A' extension of this repository.
+%
+% Compile with pdflatex (twice, for TOC and references).
+% ---------------------------------------------------------------------------
+
+\usepackage[margin=1.1in]{geometry}
+\usepackage{amsmath, amssymb, amsthm, mathtools}
+\usepackage{booktabs}
+\usepackage{xcolor}
+\usepackage[colorlinks=true, linkcolor=blue!50!black, urlcolor=blue!50!black]{hyperref}
+
+\newtheorem{theorem}{Theorem}[chapter]
+\newtheorem{lemma}[theorem]{Lemma}
+\newtheorem{proposition}[theorem]{Proposition}
+\newtheorem{corollary}[theorem]{Corollary}
+\theoremstyle{definition}
+\newtheorem{definition}[theorem]{Definition}
+\newtheorem{assumption}[theorem]{Assumption}
+\newtheorem{example}[theorem]{Example}
+\theoremstyle{remark}
+\newtheorem{remark}[theorem]{Remark}
+\newtheorem{impact}[theorem]{Project impact}
+
+\newcommand{\E}{\mathbb{E}}
+\newcommand{\Var}{\operatorname{Var}}
+\newcommand{\Cov}{\operatorname{Cov}}
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\F}{\mathcal{F}}
+\newcommand{\A}{\mathcal{A}}
+\newcommand{\dd}{\,\mathrm{d}}
+\newcommand{\Vc}{V^{c}}
+\newcommand{\Vj}{V^{j}}
+\newcommand{\TPV}{\mathrm{TPV}}
+\newcommand{\JV}{\mathrm{JV}}
+\newcommand{\RV}{\mathrm{RV}}
+\newcommand{\QV}{\mathrm{QV}}
+\newcommand{\mk}{m_{k}}
+\newcommand{\mkk}{m_{k^{2}}}
+\newcommand{\mh}{m_{h^{2}}}
+\newcommand{\mhh}{m_{h^{4}}}
+\newcommand{\mkh}{m_{kh^{2}}}
+
+\title{\textbf{Affine Jump Intensity for the Two-Factor\\ Stochastic Volatility Model}\\[1ex]
+\large A complete mathematical development: from point-process foundations\\
+to GMM moments, filtering, and variance-risk-premium analysis}
+\author{Trading / Todorov SDE \& Volatility Calibration project}
+\date{July 2026 --- Step A$'$ implementation contract}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+\noindent
+The Step-A calibration of the Todorov (2010) two-factor model was rejected by
+three held-out diagnostics: the realized jump-variance series $\JV_t$ is
+strongly serially correlated (the model demands independence), the
+cross-autocovariance between $\TPV_t$ and $\JV_t$ is two-sided (the model
+demands strict one-sidedness), and the jump feed-through persists for about a
+week (the calibrated decay dies in hours). All three failures share one cause:
+the model's jumps arrive at \emph{constant} intensity. This document develops,
+from first principles, the minimal repair: an \emph{affine stochastic
+intensity} $\lambda(t)=\lambda_{0}+\lambda_{1}\Vj(t^{-})$, which makes the jump
+process self-exciting while preserving closed-form moments. We build the
+point-process machinery from scratch, prove why the affine class is the unique
+tractable choice, establish the equivalence with an exponential-kernel marked
+Hawkes process, derive every population moment the GMM estimator needs using
+Dynkin's formula over fixed time intervals, analyze identification, and trace
+the consequences through every layer of the project: estimation, the
+latent-state filter, variance-risk-premium construction, regime
+classification, and the simulation harness that must verify the algebra before
+any estimation is run.
+\end{abstract}
+
+\tableofcontents
+
+% ===========================================================================
+\chapter{Orientation: what broke, and what we are building}
+\label{ch:orientation}
+
+\section{The rejected specification}
+
+The Step-A model drives price jumps and jump-variance jumps with a single
+Poisson random measure $\mu(\dd t,\dd x)$ whose compensator is
+$\dd t\,G(\dd x)$: \emph{time-homogeneous}. Consequences that the data
+rejected:
+
+\begin{enumerate}
+\item \textbf{$\JV$ autocovariance.} Under time-homogeneity, jump energies
+collected over disjoint days are independent, so
+$\Cov(\JV_t,\JV_{t-k})=0$ for every lag $k\ge 1$ and every parameter value.
+Empirically the lag-1 autocovariance is $\approx 12.4$ against a
+$\pm 3.5$ noise band, decaying slowly through lag $\sim$10. \emph{Jumps
+cluster.}
+\item \textbf{Cross-autocovariance asymmetry.} The model implies
+$\Cov(\TPV_t,\JV_{t+k})=0$ for $k\ge 1$: past diffusive variance cannot
+predict future jump energy, because future jump arrivals are independent of
+everything. Empirically that branch is clearly positive out to $k\approx 7$.
+\item \textbf{Feed-through persistence.} The calibrated jump-factor decay
+$|\hat\rho_j|=6.14$ (half-life 0.11 d) kills the model-implied feed-through of
+jump energy into future $\TPV$ within two days; empirically it persists about
+a week.
+\end{enumerate}
+
+\section{The repair in one paragraph}
+
+Let the arrival rate of jumps be an \emph{affine function of the jump-variance
+state itself}:
+\[
+\lambda(t) \;=\; \lambda_{0} + \lambda_{1}\,\Vj(t^{-}), \qquad
+\lambda_{0}>0,\ \lambda_{1}\ge 0 .
+\]
+Every jump raises $\Vj$, which raises the arrival rate of \emph{further}
+jumps: a self-exciting cascade. One new parameter ($\lambda_{1}$)
+simultaneously produces (i) exponentially decaying $\JV$ autocovariance,
+(ii) a two-sided cross-autocovariance whose forward branch exceeds its
+backward branch by exactly the co-jump coupling, and (iii) an
+\emph{effective} persistence rate $\kappa_{j}$ that is \emph{slower} than the
+per-jump decay rate $b=-\rho_j$ --- resolving the paradox of
+fast individual decay coexisting with slow observed persistence. Because the
+intensity is affine, all unconditional and conditional moments remain in
+closed form, so the entire GMM/filtering/VRP pipeline survives with formulas
+swapped, not rebuilt.
+
+\section{How this document is organized}
+
+Chapter~\ref{ch:pp} builds point processes, random measures, compensators and
+the martingale calculus we need --- from zero. Chapter~\ref{ch:affine}
+explains what ``affine'' means, proves why it is the tractability frontier,
+and identifies our specification with a marked Hawkes process.
+Chapter~\ref{ch:model} states the extended model and proves the central
+effective-rate theorem. Chapter~\ref{ch:moments} is the moment engine: every
+population quantity the estimator needs, derived with Dynkin's formula over
+fixed intervals, each ending in a boxed formula. Chapter~\ref{ch:gmm} treats
+identification and the GMM design. Chapter~\ref{ch:filter} rebuilds the
+latent-state projection. Chapter~\ref{ch:vrp} connects the calibrated
+physical dynamics to the variance risk premium and regime classification.
+Chapter~\ref{ch:impl} specifies simulation, verification, and the concrete
+changes to \texttt{test.py}. Appendices collect derivatives for the analytic
+Jacobian, useful integrals, notation, and an implementation checklist.
+
+\paragraph{Mathematical house rules.} Per the project's estimation protocol,
+all derivations proceed through \emph{Dynkin's formula evaluated over a fixed
+global time interval}. We never shrink a time step to zero as a derivation
+device and we never invoke the adjoint (forward/Fokker--Planck) operator.
+Stationary moments follow from the fixed-interval identity
+$\E\!\int_{0}^{T}\!\A f(X_{s})\dd s = \E f(X_{T})-\E f(X_{0}) = 0$;
+conditional moments follow from the same identity read as a Volterra integral
+equation in the interval endpoint.
+
+% ===========================================================================
+\chapter{Point processes, random measures, and compensators}
+\label{ch:pp}
+
+\section{Counting processes and the Poisson process}
+
+\begin{definition}[Counting process]
+A \emph{counting process} $N=(N_t)_{t\ge 0}$ is a right-continuous,
+nondecreasing, integer-valued process with $N_0=0$ and unit jumps. $N_t$
+counts events in $(0,t]$.
+\end{definition}
+
+\begin{definition}[Poisson process]
+$N$ is a \emph{Poisson process with rate} $\lambda>0$ if it has independent
+increments and $N_t-N_s\sim\mathrm{Poisson}(\lambda(t-s))$ for $s<t$.
+\end{definition}
+
+Two properties matter for us. First, $N_t-\lambda t$ is a martingale: the
+``compensated'' process has no predictable trend. Second, independent
+increments are exactly what the data rejected --- event counts (and energies)
+in disjoint windows are uncorrelated. Everything in this chapter generalizes
+these two facts to state-dependent rates.
+
+\section{Marked point processes and random measures}
+
+Our jumps carry a \emph{mark} $x$ (the jump size information): the $i$-th
+event is a pair $(\tau_i, x_i)$ of a time and a mark in $\R_0=\R\setminus\{0\}$
+(or a more general mark space; nothing below depends on it). The bookkeeping
+device is the \emph{random counting measure}
+\[
+\mu(A\times B) \;=\; \#\{\,i:\ \tau_i\in A,\ x_i\in B\,\},
+\qquad A\subseteq[0,\infty),\ B\subseteq\R_0 ,
+\]
+so that for any function $\psi$ of the mark,
+\[
+\int_{0}^{t}\!\!\int_{\R_0}\psi(x)\,\mu(\dd s,\dd x)
+\;=\;\sum_{i:\ \tau_i\le t}\psi(x_i)
+\]
+is the running sum of $\psi$ over the jumps so far. Realized jump variance is
+exactly such a sum with $\psi=h^{2}$; the jump-variance factor $\Vj$ is
+driven by such a sum with $\psi=k$.
+
+\section{Stochastic intensity and the compensator}
+
+\begin{definition}[Stochastic intensity]\label{def:intensity}
+Let $(\F_t)$ be the information filtration. A nonnegative,
+\emph{predictable} process $\lambda(t)$ is the ($\F_t$-)\emph{intensity} of
+the marked point process $\mu$ with i.i.d.\ marks $x_i\sim G$ if
+\[
+\nu(\dd t,\dd x)\;=\;\lambda(t)\,\dd t\,G(\dd x)
+\]
+\emph{compensates} $\mu$: for every bounded predictable integrand
+$\psi$,
+\begin{equation}\label{eq:compensation}
+M_{t}\;=\;\int_{0}^{t}\!\!\int \psi(x)\,\big[\mu(\dd s,\dd x)-\nu(\dd s,\dd x)\big]
+\quad\text{is an $(\F_t)$-martingale.}
+\end{equation}
+We write $\tilde\mu = \mu-\nu$ for the compensated measure. We normalize
+$G$ to be a \emph{probability} measure, so $\lambda(t)$ is the arrival
+\emph{rate} of jumps and marks are i.i.d.\ draws from $G$.
+\end{definition}
+
+Intuition: over the fixed window $[t,t+\Delta]$ the expected number of jumps,
+given everything known at $t$ and along the path, is
+$\E\int_{t}^{t+\Delta}\lambda(s)\dd s$; the compensator is the
+``predictable budget'' of jumps, and subtracting it leaves pure surprise.
+Predictability of $\lambda$ (using $\Vj(t^-)$, the left limit) is not
+pedantry: the rate at which the next jump arrives must be determined by the
+state \emph{just before} it arrives, otherwise a jump could raise its own
+arrival probability retroactively and \eqref{eq:compensation} would fail.
+
+\begin{remark}[Normalization choice]\label{rem:normalization}
+The Step-A code used the L\'evy-measure convention, absorbing the rate into
+$G$: its parameters $\mathcal{I}_{h^2}=\int h^2\dd G^{\text{old}}$ etc.\ are,
+in the present convention, the \emph{products}
+$\mathcal{I}_{h^2}=\lambda\,\mh$, $\mathcal{I}_{h^4}=\lambda\,\mhh$,
+$\mathcal{I}_{kh^2}=\lambda\,\mkh$, where
+$m_{\phi}:=\int\phi(x)\,G(\dd x)$. Keeping rate and mark distribution
+separate is what lets the rate become stochastic. The dictionary between old
+and new parameters is given in Table~\ref{tab:dictionary}.
+\end{remark}
+
+\section{The moment toolkit for compensated integrals}
+
+The three formulas below are the entire ``It\^o calculus'' this project needs
+for jumps. Fix a day $[t-1,t]$ and write
+$M[\psi]=\int_{t-1}^{t}\!\int\psi(x)\,\tilde\mu(\dd s,\dd x)$.
+
+\begin{lemma}[First moments]\label{lem:firstmoment}
+$\displaystyle \E\int_{t-1}^{t}\!\!\int\psi(x)\,\mu(\dd s,\dd x)
+= m_{\psi}\,\E\!\int_{t-1}^{t}\lambda(s)\dd s$, and $\E\,M[\psi]=0$.
+\end{lemma}
+
+\begin{lemma}[It\^o isometry for marked point processes]\label{lem:isometry}
+For predictable $\psi,\phi$,
+\[
+\E\big(M[\psi]\,M[\phi]\big)
+\;=\; m_{\psi\phi}\;\E\!\int_{t-1}^{t}\lambda(s)\,\dd s .
+\]
+In particular $\Var(M[\psi]) = m_{\psi^{2}}\,\E\int\lambda$.
+\end{lemma}
+
+\begin{lemma}[Orthogonality of increments]\label{lem:orthogonality}
+If $Z$ is $\F_{s}$-measurable and $M[\psi]$ is a compensated integral over
+$(s,t]$, then $\E[Z\,M[\psi]]=0$. In particular, compensated jump integrals
+over \emph{disjoint} intervals are uncorrelated, and a compensated integral is
+uncorrelated with any functional of the \emph{earlier} path.
+\end{lemma}
+
+\begin{proof}[Why these hold]
+Lemma~\ref{lem:firstmoment} is the definition of compensation applied to
+$\psi$ and the tower property. Lemma~\ref{lem:isometry}: jumps occur at
+distinct times, so the product of two jump sums over the same window is a sum
+over \emph{common} jumps of $\psi(x_i)\phi(x_i)$ plus cross terms of distinct
+jumps whose compensated expectations vanish; the common-jump sum has
+expectation $m_{\psi\phi}\E\int\lambda$ by Lemma~\ref{lem:firstmoment}.
+Lemma~\ref{lem:orthogonality} is the martingale property plus the tower
+property: $\E[Z\,M]=\E[Z\,\E(M\mid\F_{s})]=0$.
+\end{proof}
+
+These lemmas are deliberately stated with a \emph{stochastic} $\lambda$: they
+are exactly where the new model's extra covariance terms will come from,
+because $\E\int\lambda$ ceases to be a constant and starts to covary with the
+volatility path.
+
+% ===========================================================================
+\chapter{The affine principle, and why it is the tractability frontier}
+\label{ch:affine}
+
+\section{Definition and the closure property}
+
+\begin{definition}[Affine intensity]
+The intensity is \emph{affine} in the state if
+$\lambda(t)=\lambda_{0}+\lambda_{1}\Vj(t^{-})$ with $\lambda_{0}>0,\
+\lambda_{1}\ge0$ (and the state dynamics keep $\Vj\ge0$, which holds here
+because $\Vj$ decays exponentially between nonnegative jumps).
+\end{definition}
+
+The deep reason to insist on affinity is an algebraic closure property of the
+\emph{extended generator}. For our jump factor
+\[
+\dd \Vj(t) \;=\; \rho_{j}\Vj(t)\,\dd t + \int_{\R_0} k(x)\,\mu(\dd t,\dd x),
+\qquad b:=-\rho_{j}>0,\ k\ge 0,
+\]
+the generator acts on a smooth $f$ as
+\begin{equation}\label{eq:generator}
+\A f(v) \;=\; -b\,v\,f'(v)
+\;+\;\big(\lambda_{0}+\lambda_{1}v\big)\int_{\R_0}\big[f(v+k(x))-f(v)\big]\,G(\dd x).
+\end{equation}
+The first term is the deterministic decay; the second says: at rate
+$\lambda(v)$, replace $v$ by $v+k(x)$ with $x\sim G$.
+
+\begin{proposition}[Polynomial closure]\label{prop:closure}
+If $\lambda(v)$ is affine, then $\A$ maps polynomials of degree $n$ to
+polynomials of degree $n$. If $\lambda(v)$ is a polynomial of degree
+$d\ge 2$, then $\A$ maps degree $n$ to degree $n+d-1 > n$.
+\end{proposition}
+
+\begin{proof}
+Apply \eqref{eq:generator} to $f(v)=v^{n}$. The drift term gives $-nbv^{n}$:
+degree $n$. The jump term gives
+$\lambda(v)\sum_{r=0}^{n-1}\binom{n}{r}v^{r}m_{k^{n-r}}$, a polynomial of
+degree $(n-1)+\deg\lambda$. With $\deg\lambda=1$ this is degree $n$; with
+$\deg\lambda=d$ it is degree $n+d-1$.
+\end{proof}
+
+\begin{impact}
+Proposition~\ref{prop:closure} is why the whole project works. Moment
+derivations reduce (Chapter~\ref{ch:moments}) to computing $\E[\A f]$ for
+polynomial $f$. Under affinity, the $n$-th moment equation involves only
+moments of order $\le n$: a finite, triangular linear system --- closed
+form, hence an analytic GMM Jacobian, hence stable optimization. Under a
+quadratic intensity, the second-moment equation would involve the third
+moment, the third the fourth, ad infinitum: no closed form, forcing
+simulation-based estimation (orders of magnitude slower, noisy gradients,
+no analytic Jacobian --- the exact failure modes the project's coding
+standards prohibit). Affinity is not a stylistic choice; it is the boundary
+between ``rederive formulas in an afternoon'' and ``rebuild the estimator.''
+\end{impact}
+
+\section{Equivalence with a marked Hawkes process}
+
+\begin{proposition}[Hawkes representation]\label{prop:hawkes}
+Suppose $\Vj$ starts from its stationary distribution in the infinite past.
+Then
+\[
+\Vj(t)\;=\;\sum_{\tau_i\le t} k(x_i)\,e^{-b(t-\tau_i)},
+\qquad
+\lambda(t)\;=\;\lambda_{0}+\lambda_{1}\!\!\sum_{\tau_i< t} k(x_i)\,e^{-b(t-\tau_i)} .
+\]
+That is: the pair (jump times, intensity) is precisely a \emph{marked Hawkes
+process with exponential kernel} $\lambda_{1}k(x)e^{-bu}$ and baseline
+$\lambda_{0}$.
+\end{proposition}
+
+\begin{proof}
+Between jumps $\Vj$ satisfies $\dd\Vj=-b\Vj\dd t$, so each jump's
+contribution $k(x_i)$ decays as $e^{-b(t-\tau_i)}$; summing contributions
+gives the display (the transient from the infinite past vanishes).
+Substituting into $\lambda=\lambda_0+\lambda_1\Vj(t^-)$ gives the Hawkes
+form.
+\end{proof}
+
+The Hawkes lens supplies the two most useful intuitions in this document.
+
+\paragraph{Cluster (branching) representation.} A Hawkes process is
+statistically identical to the following cascade: \emph{immigrant} events
+arrive as a plain Poisson process with rate $\lambda_{0}$; each event (of any
+generation) with mark $x$ independently spawns \emph{children} as an
+inhomogeneous Poisson process with rate $\lambda_{1}k(x)e^{-bu}$, $u$ its
+age. The expected number of children per event is
+\begin{equation}\label{eq:eta}
+\eta \;=\; \int_0^\infty \lambda_1 m_k e^{-bu}\,du
+\;=\; \frac{\lambda_{1}\,\mk}{b}
+\qquad\text{(the \emph{branching ratio}).}
+\end{equation}
+A cluster started by one immigrant has expected total size
+$1+\eta+\eta^{2}+\cdots=(1-\eta)^{-1}$: finite iff $\eta<1$.
+
+\begin{assumption}[Subcriticality]\label{ass:subcritical}
+$\eta=\lambda_{1}\mk/b<1$. This is necessary and sufficient for a stationary
+version of $(\Vj,\lambda)$ with finite moments of all orders used below.
+\end{assumption}
+
+\paragraph{Two decay rates.} Each individual excitation decays at rate $b$
+(fast, hours). But a burst is a \emph{cluster}: children arrive while the
+parent's excitation wanes, grandchildren while the children's wanes. The
+aggregate relaxation of the cascade is slower than any individual decay. The
+next chapter makes this exact: the observable persistence rate is
+$\kappa_{j}=b(1-\eta)$, and $\eta\to1$ drags $\kappa_j\to0$ regardless of
+how fast $b$ is. This is the mathematical resolution of the Step-A paradox
+(fitted $|\rho_j|=6.14$ versus week-long empirical feed-through): the old
+model owns one decay rate and was forced to compromise; the new model owns
+two.
+
+% ===========================================================================
+\chapter{The extended model}
+\label{ch:model}
+
+\section{Full specification}
+
+\begin{assumption}[Model $\mathcal{M}'$]\label{ass:model}
+Under the physical measure $\mathbb{P}$, on a filtered probability space
+carrying a Brownian motion $B_{1}$ and a marked point process $\mu$ with
+i.i.d.\ marks $x\sim G$ (a probability measure) and stochastic intensity
+$\lambda(t)$:
+\begin{align}
+\dd \Vc(t) &= \kappa_{c}\big(\bar V^{c}-\Vc(t)\big)\dd t
+             + \sigma_{cv}\sqrt{\Vc(t)}\,\dd B_{1}(t),
+&&\text{(CIR, unchanged)} \label{eq:cir}\\[0.5ex]
+\dd \Vj(t) &= \rho_{j}\Vj(t)\,\dd t + \int_{\R_0} k(x)\,\mu(\dd t,\dd x),
+&&b:=-\rho_{j}>0, \label{eq:vj}\\[0.5ex]
+\lambda(t) &= \lambda_{0}+\lambda_{1}\Vj(t^{-}),
+&&\lambda_{0}>0,\ \lambda_{1}\ge0, \label{eq:intensity}
+\end{align}
+with $B_{1}\perp\mu$, $k\ge 0$, and Assumption~\ref{ass:subcritical}. Total
+diffusive variance is $\sigma^{2}(t)=\Vc(t)+\Vj(t)$; the same jumps that
+feed $\Vj$ carry price-jump energy $h^{2}(x)$. The daily observables over
+$[t-1,t]$ are
+\[
+\TPV_{t}\approx\int_{t-1}^{t}\!\big(\Vc(s)+\Vj(s)\big)\dd s,
+\qquad
+\JV_{t}\approx\int_{t-1}^{t}\!\!\int h^{2}(x)\,\mu(\dd s,\dd x).
+\]
+The translation gauge $k(x)=c\,h^{2}(x)$, $c>0$, links the two jump kernels,
+so mark moments satisfy $\mk=c\,\mh$, $\mkk=c^{2}\mhh$, $\mkh=c\,\mhh$.
+\end{assumption}
+
+Setting $\lambda_{1}=0$ recovers the Step-A model exactly: the extension
+\emph{nests} the old one, which is essential --- it lets the data vote on
+$\lambda_{1}$, and it gives a free correctness check on every new formula
+(each must reduce to the old one at $\lambda_{1}=0$).
+
+\section{The effective persistence rate}
+
+\begin{theorem}[Stationary mean and effective rate]\label{thm:effective}
+Under Assumptions \ref{ass:subcritical}--\ref{ass:model}, the stationary
+means are
+\[
+\bar\lambda := \E[\lambda(t)]=\frac{\lambda_{0}}{1-\eta},
+\qquad
+\bar v := \E[\Vj(t)]=\frac{\bar\lambda\,\mk}{b}
+        =\frac{\lambda_{0}\,\mk}{b(1-\eta)} ,
+\]
+and the conditional mean relaxes exponentially at the \emph{effective rate}
+\[
+\boxed{\;\kappa_{j}\;=\;b-\lambda_{1}\mk\;=\;b\,(1-\eta)\;}
+\qquad\text{i.e.}\qquad
+\E\big[\Vj(t+s)\,\big|\,\F_{t}\big]
+=\bar v+\big(\Vj(t)-\bar v\big)e^{-\kappa_{j}s}.
+\]
+Consequently $\Cov\big(\Vj(t),\Vj(t+s)\big)=\Var(\Vj)\,e^{-\kappa_{j}|s|}$.
+\end{theorem}
+
+\begin{proof}
+Apply Dynkin's formula on the fixed interval $[t,t+s]$ to $f(v)=v$, for
+which \eqref{eq:generator} gives
+$\A f(v) = -bv+(\lambda_{0}+\lambda_{1}v)\,\mk$:
+\[
+\E_{t}\big[\Vj(t+s)\big]-\Vj(t)
+=\E_{t}\!\int_{t}^{t+s}\!\Big[-b\,\Vj(u)+\mk\big(\lambda_{0}
++\lambda_{1}\Vj(u)\big)\Big]\dd u .
+\]
+Write $g(s)=\E_{t}[\Vj(t+s)]$. The identity above, read for every endpoint
+$s$ of the fixed interval, is the Volterra equation
+$g(s)=g(0)+\int_{0}^{s}\!\big[\lambda_{0}\mk-\kappa_{j}\,g(u)\big]\dd u$
+with $\kappa_{j}=b-\lambda_{1}\mk$; its unique solution is the boxed
+exponential with resting point $\lambda_{0}\mk/\kappa_{j}=\bar v$.
+Stationary means: take $f(v)=v$ in the stationarity identity
+$\E[\A f]=0$ to get $b\bar v=\bar\lambda\mk$, and take expectations in
+\eqref{eq:intensity} to get $\bar\lambda=\lambda_{0}+\lambda_{1}\bar v$;
+solving the pair gives the display. The autocovariance follows from the
+conditional mean by the tower property:
+$\Cov(\Vj_{t},\Vj_{t+s})
+=\E\big[(\Vj_t-\bar v)\,\E_t(\Vj_{t+s}-\bar v)\big]
+=\Var(\Vj)e^{-\kappa_j s}$.
+\end{proof}
+
+\begin{remark}[Reading the theorem]
+$b$ is the \emph{microscopic} decay: how fast one excitation wanes.
+$\kappa_{j}=b(1-\eta)$ is the \emph{macroscopic} decay: how fast the whole
+cascade relaxes, slowed by the factor $(1-\eta)$ because decaying excitation
+keeps being replenished by offspring jumps. The data constrains
+$\kappa_{j}$ (through every autocovariance and cross-covariance decay), while
+$b$ appears separately only through the mean level $\bar v=\bar\lambda\mk/b$.
+The Step-A transience mandate (``jump factor half-life under 2 days'')
+properly applies to $b$; the persistence the diagnostics revealed lives in
+$\kappa_{j}$. Both can now be honored at once.
+\end{remark}
+
+\begin{theorem}[Stationary variance]\label{thm:varvj}
+$\displaystyle
+S:=\Var(\Vj)=\frac{\bar\lambda\,\mkk}{2\kappa_{j}} .$
+\end{theorem}
+
+\begin{proof}
+Take $f(v)=v^{2}$: $\A f(v)=-2bv^{2}
++(\lambda_{0}+\lambda_{1}v)\big(2v\mk+\mkk\big)$. Stationarity
+($\E[\A f]=0$) gives
+\[
+2\big(b-\lambda_{1}\mk\big)\E[V^{2}]
+=2\lambda_{0}\mk\,\bar v+\mkk\,\bar\lambda .
+\]
+From the proof of Theorem~\ref{thm:effective},
+$\lambda_{0}\mk=\kappa_{j}\bar v$, so
+$\E[V^{2}]=\bar v^{2}+\bar\lambda\mkk/(2\kappa_{j})$, and subtracting
+$\bar v^{2}$ gives the claim.
+\end{proof}
+
+Note the same effective rate $\kappa_{j}$ divides the variance: stronger
+self-excitation ($\eta\uparrow$) both slows the decay and fattens the
+stationary spread --- one mechanism, two visible symptoms, which is why the
+data can identify it.
+
+% ===========================================================================
+\chapter{The moment engine}
+\label{ch:moments}
+
+This chapter derives every population moment used downstream. Throughout,
+$S=\Var(\Vj)$, $\kappa_{j}=b(1-\eta)$, $\bar\lambda$, $\bar v$ are as in
+Chapter~\ref{ch:model}, and $\sigma_{c}^{2}=\sigma_{cv}^{2}\bar V^{c}/(2\kappa_{c})$
+is the CIR stationary variance (unchanged from Step A).
+
+\section{The damping trio}
+
+Daily observables are \emph{time integrals}, which blur point-in-time
+covariances. All blurring is captured by three scalar functions.
+
+\begin{lemma}[Integration damping]\label{lem:damping}
+Let $X$ be stationary with $\Cov(X_{t},X_{t+s})=\varsigma^{2}e^{-a|s|}$, and
+let $I_{t}=\int_{t-1}^{t}X_{s}\dd s$. Define
+\[
+f(a)=\frac{2\,(a-1+e^{-a})}{a^{2}},\qquad
+\hat g(a)=\frac{1-e^{-a}}{a},\qquad
+g(a)=\hat g(a)^{2}=\frac{(1-e^{-a})^{2}}{a^{2}} .
+\]
+Then for integer $k\ge1$:
+\[
+\Var(I_{t})=\varsigma^{2}f(a),\qquad
+\Cov(I_{t},I_{t-k})=\varsigma^{2}g(a)\,e^{-a(k-1)},\qquad
+\Cov(X_{t},I_{t-k})=\varsigma^{2}\hat g(a)\,e^{-ak}\ (k\ge0).
+\]
+\end{lemma}
+
+\begin{proof}
+All three are Fubini integrals of $e^{-a|u-w|}$ over, respectively, the unit
+square $\{u,w\in[0,1]\}$ (split along the diagonal, giving $f$), the
+displaced square $\{u\in[k,k+1],w\in[0,1]\}$ (giving $g\,e^{-a(k-1)}$), and
+the segment $\{w\in[k,k+1]\}$ with $u$ fixed at $0$ distance $k$ away (giving
+$\hat g\,e^{-ak}$). The piecewise transition $f\ne g$ at the $k{=}0\to
+k{=}1$ boundary is the structural discontinuity the spec calls the
+``time-integration blur.''
+\end{proof}
+
+Numerically, $f,g,\hat g$ must be evaluated with \texttt{expm1} to avoid
+catastrophic cancellation at small $a$ (Appendix~\ref{app:derivatives}
+collects values, limits, and derivatives).
+
+\section{The covariance kernel of jumps with the future state}
+
+The single computation from which all cross moments flow:
+
+\begin{lemma}[Feed-through kernel]\label{lem:kernel}
+For $s\ge u$, with $M[\psi]$ the compensated $\psi$-jump integral,
+\[
+\Cov\!\big(\psi\text{-jump surprise in }\dd u,\ \Vj(s)\big)
+=\bar\lambda\,m_{k\psi}\,e^{-\kappa_{j}(s-u)}\,\dd u ,
+\]
+and the covariance is zero for $s<u$. In integrated form, for the running
+martingale $M_{s}=\int_{0}^{s}\!\int\psi\,\dd\tilde\mu$ started at $0$ from
+stationarity,
+$\ \Cov(\Vj(s),M_{s})
+=\dfrac{\bar\lambda\,m_{k\psi}}{\kappa_{j}}\big(1-e^{-\kappa_{j}s}\big)$.
+\end{lemma}
+
+\begin{proof}
+Apply Dynkin's formula on the fixed interval $[0,s]$ to the \emph{pair}
+$(V,M)=(\Vj,M)$ with $f(v,m)=vm$. Between jumps, $\dd V=-bV\dd t$ and
+$\dd M=-\lambda(t)m_{\psi}\dd t$ (the compensator drift); a jump with mark
+$x$ moves $(v,m)\mapsto(v+k(x),\,m+\psi(x))$. Hence
+\[
+\A f(v,m) = -b\,vm \;-\;\lambda(v)\,m_{\psi}\,v
+\;+\;\lambda(v)\big[v\,m_{\psi}+m\,\mk+m_{k\psi}\big]
+= -b\,vm+\lambda(v)\big(m\,\mk+m_{k\psi}\big).
+\]
+Take expectations with $\phi(s):=\E[V(s)M(s)]$, use $\E[M]=0$ (so
+$\E[\lambda M]=\lambda_{1}\E[VM]$) and $\E[\lambda]=\bar\lambda$:
+\[
+\phi(s)=\int_{0}^{s}\!\big[-\kappa_{j}\,\phi(u)
++\bar\lambda\,m_{k\psi}\big]\dd u
+\;\Longrightarrow\;
+\phi(s)=\frac{\bar\lambda m_{k\psi}}{\kappa_{j}}\big(1-e^{-\kappa_{j}s}\big),
+\]
+again a Volterra identity on a fixed interval. Differentiating the closed
+form in $s$ and matching against
+$\phi(s)=\int_{0}^{s}\text{(kernel)}(s,u)\dd u$ identifies the kernel as
+$\bar\lambda m_{k\psi}e^{-\kappa_j(s-u)}$. For $s<u$
+Lemma~\ref{lem:orthogonality} gives zero.
+\end{proof}
+
+Note carefully: the kernel decays at $\kappa_{j}$, \emph{not} $b$. A jump's
+direct excitation decays at $b$, but its \emph{descendants} keep the
+expectation elevated; the conditional-mean rate $\kappa_j$ governs
+everything observable.
+
+\section{Decomposing \texorpdfstring{$\JV$}{JV}}
+
+The master decomposition, used everywhere below:
+\begin{equation}\label{eq:jvdecomp}
+\JV_{t}
+=\underbrace{M_{t}}_{\text{jump surprise}}
++\;\mh\,\Lambda_{t},
+\qquad
+M_{t}:=\int_{t-1}^{t}\!\!\int h^{2}\dd\tilde\mu,
+\quad
+\Lambda_{t}:=\int_{t-1}^{t}\!\lambda(s)\dd s
+=\lambda_{0}+\lambda_{1}\!\!\int_{t-1}^{t}\!\!\Vj(s)\dd s .
+\end{equation}
+$M_{t}$ is white (Lemma~\ref{lem:orthogonality}); all serial dependence of
+$\JV$ rides on $\Lambda_{t}$, i.e.\ on the integrated $\Vj$ path --- which is
+also what $\TPV$ observes. This one line already explains, qualitatively,
+every diagnostic: $\JV$ autocorrelates because $\Lambda$ does; $\TPV$
+predicts future $\JV$ because both load on $\Vj$; and jump surprises feed
+future $\TPV$ through the kernel of Lemma~\ref{lem:kernel}.
+
+\section{The complete moment set}
+
+Write $\mathcal{E}_{k}:=e^{-\kappa_{j}(k-1)}$ and
+$\mathcal{E}^{c}_{k}:=e^{-\kappa_{c}(k-1)}$ for $k\ge 1$.
+
+\begin{theorem}[Population moments of the observables]\label{thm:moments}
+Under Assumption~\ref{ass:model}, for lags $k\ge1$:
+\begin{align}
+&\textbf{Means:}&
+\E[\TPV_{t}]&=\bar V^{c}+\bar v, &
+\E[\JV_{t}]&=\bar\lambda\,\mh . \label{eq:means}\\[1ex]
+&\textbf{TPV block:}&
+\Var(\TPV_{t})&=\sigma_{c}^{2}f(\kappa_{c})+S\,f(\kappa_{j}),\hspace{-4em} && \label{eq:vartpv}\\
+&&\Cov(\TPV_{t},\TPV_{t-k})&=\sigma_{c}^{2}g(\kappa_{c})\,\mathcal{E}^{c}_{k}
++S\,g(\kappa_{j})\,\mathcal{E}_{k}. \hspace{-4em}&&\label{eq:acovtpv}\\[1ex]
+&\textbf{JV block:}&
+\Var(\JV_{t})&=\bar\lambda\,\mhh
++\Big[\lambda_{1}^{2}\mh^{2}\,S+\lambda_{1}\mh\,\bar\lambda\,\mkh\Big]f(\kappa_{j}),
+\hspace{-10em}&&\label{eq:varjv}\\
+&&\Cov(\JV_{t},\JV_{t-k})&=
+\underbrace{\lambda_{1}\mh\big[\lambda_{1}\mh\,S+\bar\lambda\,\mkh\big]}_{=:C_{J}}
+\,g(\kappa_{j})\,\mathcal{E}_{k}. \hspace{-10em}&&\label{eq:acovjv}\\[1ex]
+&\textbf{Cross block:}&
+\Cov(\TPV_{t},\JV_{t})&=\bar\lambda\,\mkh\,\tfrac{1}{2}f(\kappa_{j})
++\lambda_{1}\mh\,S\,f(\kappa_{j}), \hspace{-10em}&&\label{eq:cross0}\\
+&&\Cov(\TPV_{t},\JV_{t-k})&=
+\underbrace{\big[\bar\lambda\,\mkh+\lambda_{1}\mh\,S\big]}_{=:C_{F}}
+\,g(\kappa_{j})\,\mathcal{E}_{k}
+\quad\text{(jumps lead),}\hspace{-12em}&&\label{eq:crossfwd}\\
+&&\Cov(\TPV_{t},\JV_{t+k})&=
+\underbrace{\lambda_{1}\mh\,S}_{=:C_{B}}
+\,g(\kappa_{j})\,\mathcal{E}_{k}
+\quad\text{(variance leads).}\hspace{-12em}&&\label{eq:crossbwd}
+\end{align}
+\end{theorem}
+
+\begin{proof}
+\emph{Means}: Lemma~\ref{lem:firstmoment} with $\psi=h^{2}$ and
+Theorem~\ref{thm:effective}. \emph{TPV block}: $\Vc\perp\Vj$, each with an
+exponential autocovariance ($\kappa_c$ from the CIR, $\kappa_j$ from
+Theorem~\ref{thm:effective}); apply Lemma~\ref{lem:damping} factorwise.
+\emph{JV block}: expand \eqref{eq:jvdecomp}.
+$\Var(M_t)=\bar\lambda\mhh$ (Lemma~\ref{lem:isometry});
+$\Var(\mh\Lambda_t)=\mh^2\lambda_1^2\,S f(\kappa_j)$
+(Lemma~\ref{lem:damping} applied to $\Vj$);
+$2\mh\Cov(M_t,\Lambda_t)
+=2\mh\lambda_1\Cov\big(M_t,\int\Vj\big)
+=2\mh\lambda_1\cdot\bar\lambda\mkh\cdot\tfrac12 f(\kappa_j)$, where the last
+step integrates the kernel of Lemma~\ref{lem:kernel} ($\psi=h^2$,
+$m_{kh^2}=\mkh$) over the triangle $\{u\le s\}$ of the unit square ---
+exactly the $\tfrac12 f$ geometry of Lemma~\ref{lem:damping}. Summing gives
+\eqref{eq:varjv}. For lags: $M$'s of disjoint days are mutually orthogonal
+and orthogonal to the earlier path (Lemma~\ref{lem:orthogonality}), so only
+$\Lambda$--$\Lambda$ and past-$M$--future-$\Lambda$ terms survive:
+$\mh^2\lambda_1^2 S g(\kappa_j)\mathcal{E}_k$ and
+$\mh\lambda_1\cdot\bar\lambda\mkh\,g(\kappa_j)\mathcal{E}_k$ (kernel
+integrated over displaced squares); factoring yields \eqref{eq:acovjv}.
+\emph{Cross block}: $\Cov(\int\Vj\text{-day }t,\ \JV_{t-k})$ has an
+$M$-part (kernel over the displaced square:
+$\bar\lambda\mkh\,g(\kappa_j)\mathcal{E}_k$) and a $\Lambda$-part
+($\lambda_1\mh S g(\kappa_j)\mathcal{E}_k$), giving \eqref{eq:crossfwd};
+at $k=0$ the $M$-part sees only the triangle ($\tfrac12 f$) while the
+$\Lambda$-part sees the full square ($f$), giving \eqref{eq:cross0}; in the
+backward direction the $M$-part dies (future surprises are orthogonal to the
+past, Lemma~\ref{lem:orthogonality}) and only the $\Lambda$-part survives,
+giving \eqref{eq:crossbwd}. $\Vc$ contributes nowhere in the JV/cross blocks
+by independence.
+\end{proof}
+
+\begin{corollary}[Nesting]\label{cor:nesting}
+At $\lambda_{1}=0$: $\kappa_{j}=b$, $\bar\lambda=\lambda_0$,
+$C_{J}=C_{B}=0$, $C_{F}=\lambda_{0}\mkh$, and every formula collapses to the
+Step-A model with $\mathcal{I}_{h^2}=\lambda_0\mh$,
+$\mathcal{I}_{h^4}=\lambda_0\mhh$, $\mathcal{I}_{kh^2}=\lambda_0\mkh$.
+\end{corollary}
+
+\begin{corollary}[Structure of the extension]\label{cor:structure}
+The three rejected diagnostics are repaired with signs and shapes forced by
+the theory:
+\begin{enumerate}
+\item $\JV$ autocovariance is a single exponential in $\kappa_{j}$ with
+positive weight $C_{J}$ --- matching the observed slow decay;
+\item the cross-autocovariance is \emph{two-sided}, and its asymmetry is
+exactly the co-jump coupling:
+$C_{F}-C_{B}=\bar\lambda\,\mkh\ \ge 0$ --- matching the observed
+``both sides positive, forward larger'';
+\item all serial decay happens at the effective rate $\kappa_{j}$, which can
+be slow (persistent cascades) even while $b$ is fast (transient individual
+shocks) --- matching the week-long feed-through.
+\end{enumerate}
+Moreover the three coefficients obey the \textbf{internal consistency
+identity}
+\[
+\boxed{\;C_{J}\cdot S \;=\; C_{B}\cdot C_{F}\;}
+\]
+(immediate from $C_J=\lambda_1\mh\,C_F$ and $C_B=\lambda_1\mh\,S$): an
+over-identifying restriction imposed on \emph{empirical} quantities that the
+data can reject. It is a free, sharp specification test and should be
+reported with the calibration.
+\end{corollary}
+
+% ===========================================================================
+\chapter{Identification and GMM design}
+\label{ch:gmm}
+
+\section{What is actually identified: composite parameters}
+
+Inspect Theorem~\ref{thm:moments}: the raw quantities
+$(\lambda_{0},\lambda_{1},\mh,\mhh,c)$ never appear alone. Every moment is a
+function of the \emph{composites}
+\[
+A:=\bar\lambda\,\mh,\qquad
+B:=\bar\lambda\,\mhh,\qquad
+\psi:=\lambda_{1}\,\mh,\qquad
+c,\qquad \kappa_{j},\qquad \kappa_{c},\ \sigma_{c}^{2},\ \bar V^{c},\ S,
+\]
+using the gauge to write $\mkh=c\,\mhh$, hence
+$\bar\lambda\mkh=cB$, and (from Theorem~\ref{thm:effective})
+\[
+\bar v=\frac{\bar\lambda\,\mk}{b}=\frac{c\,A}{b},
+\qquad
+b=\kappa_{j}+\psi\,c,
+\qquad
+\eta=\frac{\psi c}{b}.
+\]
+In composite form the moment set reads:
+\begin{align*}
+\E[\JV]&=A, &
+\Var(\JV)&=B+\big(\psi^{2}S+\psi\,cB\big)f(\kappa_{j}),\\
+\E[\TPV]&=\bar V^{c}+\tfrac{cA}{\kappa_{j}+\psi c}, &
+\gamma^{\JV}_{k}&=\psi\,(cB+\psi S)\;g(\kappa_{j})\,\mathcal{E}_{k},\\
+\Var(\TPV)&=\sigma_{c}^{2}f(\kappa_{c})+S f(\kappa_{j}), &
+\gamma^{\TPV}_{k}&=\sigma_{c}^{2}g(\kappa_{c})\mathcal{E}^{c}_{k}+S g(\kappa_{j})\mathcal{E}_{k},\\
+\Cov(\TPV_t,\JV_t)&=cB\,\tfrac{f(\kappa_j)}{2}+\psi S f(\kappa_{j}), &
+\text{cross}^{\pm}_{k}&=\big(cB+\psi S\big)\,\text{or}\,\big(\psi S\big)
+\times g(\kappa_{j})\mathcal{E}_{k}.
+\end{align*}
+
+\begin{proposition}[Scale degeneracy and normalization]\label{prop:ident}
+$(\lambda_{0},\lambda_{1},\mh,\mhh)$ enter only through $(A,B,\psi)$: the
+split of jump activity between \emph{rate} and \emph{mark size} is not
+identified from these moments (``twice as many jumps, half the energy each''
+is observationally equivalent at this moment order). We therefore normalize
+the mark scale, $\mh:=1$, after which
+\[
+\bar\lambda=A,\qquad \mhh=B/A,\qquad \lambda_{1}=\psi,
+\qquad \lambda_{0}=\bar\lambda(1-\eta)
+\]
+are exactly recovered. This is a labeling convention, not a restriction:
+every observable quantity and every downstream object (filter, VRP forecast)
+depends on the composites only.
+\end{proposition}
+
+\begin{remark}[Gauge: strict vs.\ relaxed]\label{rem:gauge}
+The gauge $k=c\,h^{2}$ applied to \emph{second} mark moments forces
+$\mkk=c^{2}\mhh$, which by Theorem~\ref{thm:varvj} ties down
+$S=c^{2}B/(2\kappa_{j})$ --- removing $S$ from the free set. We recommend
+estimating with $S$ \textbf{free} (``relaxed gauge'': the gauge is used only
+where the spec requires it, for the level recovery $\bar v=cA/b$), for two
+reasons: it nests the Step-A treatment (where $\Var(V^j)$ was free), and it
+converts the strict-gauge equation into a second testable over-identifying
+restriction, $S\stackrel{?}{=}c^{2}B/(2\kappa_{j})$, to report alongside
+$C_{J}S=C_{B}C_{F}$. If both restrictions survive, re-estimate under the
+strict gauge for efficiency.
+\end{remark}
+
+\section{The estimable vector, bounds, and moment menu}
+
+\begin{center}
+\fbox{\parbox{0.92\textwidth}{
+\textbf{Parameter vector (relaxed gauge, $\mh=1$):}
+\[
+\Theta'=\big[\;\kappa_{c},\ \sigma_{c}^{2},\ \bar V^{c},\
+\kappa_{j},\ A,\ B,\ \psi,\ c,\ S\;\big]\in\R^{9}.
+\]
+\textbf{Derived (reported, not estimated):}\quad
+$b=\kappa_{j}+\psi c$,\quad $\eta=\psi c/b$,\quad
+$\bar\lambda=A$,\quad $\lambda_{0}=A(1-\eta)$,\quad
+$\lambda_{1}=\psi$,\quad $\bar v=cA/b$,\quad
+$\rho_{j}=-b$.
+}}
+\end{center}
+
+\paragraph{Bounds.} All of
+$\sigma_{c}^{2},\bar V^{c},A,B,\psi,c,S$ strictly positive; $\kappa_{c}$
+in its persistence band as mandated. Two structural constraints deserve
+emphasis:
+\begin{itemize}
+\item \textbf{Stationarity is free.} $\eta<1\iff\kappa_{j}>0$: by
+parametrizing with $\kappa_{j}$ directly, subcriticality is enforced by a
+simple positivity bound --- no nonlinear constraint needed. This is a real
+design win of the composite parametrization.
+\item \textbf{The old transience mandate moves to $b$.} ``Jump factor
+half-life $<2$ days'' constrains $b=\kappa_{j}+\psi c\ge\ln 2/2$, a
+\emph{linear} inequality in $(\kappa_{j},\psi,c)$-space (impose via
+\texttt{scipy.optimize} linear constraint or check-and-report). $\kappa_{j}$
+itself must be left \emph{free to be persistent} --- that freedom is the
+entire point of the extension.
+\end{itemize}
+
+\paragraph{Moment menu.} The recommended GMM target set (all formulas from
+Theorem~\ref{thm:moments}):
+\begin{center}
+\begin{tabular}{llr}
+\toprule
+block & moments & count\\
+\midrule
+means & $\E[\TPV],\ \E[\JV]$ & 2\\
+variances & $\Var(\TPV),\ \Var(\JV)$ & 2\\
+contemporaneous cross & $\Cov(\TPV_t,\JV_t)$ & 1\\
+$\TPV$ autocovariance & $k=1,\dots,15$ & 15\\
+$\JV$ autocovariance & $k=1,\dots,10$ & 10\\
+forward cross (jumps lead) & $k=1,\dots,5$ & 5\\
+backward cross (variance leads) & $k=1,\dots,5$ & 5\\
+\midrule
+total & & 40\\
+\bottomrule
+\end{tabular}
+\end{center}
+Nine parameters, forty moments: heavily over-identified, by design --- the
+over-identification \emph{is} the specification test. Note the reversal from
+Step A: the $\JV$ autocovariances, previously excluded because their
+Jacobian rows were identically zero, are now the \emph{primary} carriers of
+information about $\psi$ and $\kappa_{j}$; the backward cross moments are
+the only block that separates $C_{B}=\psi S$ from $C_{F}=cB+\psi S$, i.e.\
+they identify $c$.
+
+\paragraph{Who identifies whom (the mental map).}
+\begin{center}
+\begin{tabular}{ll}
+\toprule
+parameter & primary identifying feature\\
+\midrule
+$\kappa_{j}$ & common decay slope of $\JV$-acov, cross-acov (log-linear in $k$)\\
+$\kappa_{c},\sigma_{c}^{2}$ & slow residual component of $\TPV$-acov after the $\kappa_{j}$ part\\
+$S$ & fast component weight in $\TPV$-acov ($S g(\kappa_{j})$)\\
+$A$ & $\E[\JV]$\\
+$B$ & $\Var(\JV)$ level (the $f$-terms are second order)\\
+$\psi$ & $\JV$-acov weight $C_{J}$ and backward-cross weight $C_{B}=\psi S$\\
+$c$ & cross asymmetry $C_{F}-C_{B}=cB$\\
+$\bar V^{c}$ & $\E[\TPV]$ net of $\bar v=cA/b$\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\section{Weighting, conditioning, and the Jacobian}
+
+Everything the Step-A code does survives, amplified:
+\begin{itemize}
+\item \textbf{Weighting matrix.} Forty moment contributions, many of them
+products of heavy-tailed series, make the raw covariance of moment
+conditions worse-conditioned than Step A's ($2.6\times10^{6}$ before
+truncation). Ledoit--Wolf shrinkage remains mandatory; keep the
+condition-number guardrail (warn above $100$, ridge backstop) and expect a
+larger shrinkage intensity. Consider estimating $W$ once at the empirical
+moments (as now) and, once stable, a second GMM step at $\hat\Theta'$.
+\item \textbf{Analytic Jacobian.} Every moment is a product of (i) a
+coefficient polynomial in $(\sigma_c^2,S,A,B,\psi,c)$ --- linear or
+bilinear, trivial derivatives --- and (ii) a damping factor
+$f,g,\hat g$ evaluated at $\kappa_{c}$ or $\kappa_{j}$ times an exponential
+lag term. Chain rule through the composites; the only new scalar derivatives
+needed are $f',g',\hat g'$ (Appendix~\ref{app:derivatives}) --- already in
+the codebase for $f',g'$. The mean $\E[\TPV]$ additionally involves
+$\partial_{(\kappa_j,\psi,c)}\,cA/(\kappa_{j}+\psi c)$: elementary
+quotients.
+\item \textbf{Multi-start.} The surface now has a genuine ridge:
+$(\psi\uparrow, S\downarrow)$ trade off in $C_{B}$ while
+$C_{F}$ compensates through $c$. Seed the multi-start grid from the
+composite mental map above: $\hat\kappa_{j}$ from a log-linear fit to the
+empirical $\JV$-acov slope, $\hat C_{B}/\hat S\to\psi$,
+$(\hat C_{F}-\hat C_{B})/\hat B\to c$ --- i.e., \emph{method-of-moments
+initialization from exactly the diagnostics that motivated the extension}.
+\item \textbf{Uncertainty.} Parameters near bounds and ridge geometry make
+point estimates insufficient: run the repository's block bootstrap over
+$\Theta'$ and report intervals for the \emph{derived} quantities too
+($\eta$, $b$, half-lives $\ln 2/\kappa_{j}$, $\ln 2/b$) --- the branching
+ratio $\eta$ with its CI is the headline number of the whole exercise
+(``how self-exciting is BTC jump risk?'').
+\end{itemize}
+
+% ===========================================================================
+\chapter{Filtering: projecting the latent states}
+\label{ch:filter}
+
+\section{LMMSE without Gaussianity}
+
+The Step-B objective is the best \emph{linear} projection of
+$X_{t}=(\Vc(t),\Vj(t))'$ onto a window of observables
+$Y_{t}=(\TPV_{t-j},\JV_{t-j})_{j=0}^{p-1}$:
+\[
+\hat X_{t}=\mu_{X}+\Sigma_{XY}\Sigma_{YY}^{-1}\,(Y_{t}-\mu_{Y}),
+\qquad
+\text{MSE}=\Sigma_{XX}-\Sigma_{XY}\Sigma_{YY}^{-1}\Sigma_{YX}.
+\]
+No Gaussianity is assumed or needed: among all linear functions of $Y_t$
+this minimizes mean-squared error, period. What the model supplies is the
+\emph{population second-moment structure}; better structure, better filter.
+This is where the extension pays concretely: under Step A the model's
+$\Sigma_{XY}$ said lagged $\JV$ was nearly worthless (loadings decaying at
+$e^{-6.14k}$) --- under $\mathcal{M}'$ the loadings decay at
+$e^{-\kappa_{j}k}$ with $\kappa_{j}$ estimated from data that clearly wants
+persistence.
+
+\section{The projection inputs, in closed form}
+
+$\mu_{X}=(\bar V^{c},\ \bar v)'$; $\mu_{Y}$ stacks
+\eqref{eq:means}. $\Sigma_{XX}=\operatorname{diag}(\sigma_{c}^{2},\,S)$
+(the factors are independent). The cross block, from
+Lemma~\ref{lem:damping} (third formula) and the kernel of
+Lemma~\ref{lem:kernel} --- all with the \emph{uniform} lag law valid for
+$k\ge0$:
+\begin{equation}\label{eq:sigmaxy}
+\boxed{
+\begin{aligned}
+\Cov\big(\Vc(t),\ \TPV_{t-k}\big)&=\sigma_{c}^{2}\ \hat g(\kappa_{c})\,e^{-\kappa_{c}k},
+&\Cov\big(\Vc(t),\ \JV_{t-k}\big)&=0,\\
+\Cov\big(\Vj(t),\ \TPV_{t-k}\big)&=S\ \hat g(\kappa_{j})\,e^{-\kappa_{j}k},
+&\Cov\big(\Vj(t),\ \JV_{t-k}\big)&=C_{F}\ \hat g(\kappa_{j})\,e^{-\kappa_{j}k}.
+\end{aligned}}
+\end{equation}
+(The $\Vj$--$\JV$ entry combines the jump-surprise kernel,
+$\bar\lambda\mkh=cB$, with the intensity channel, $\psi S$; their sum is the
+same $C_{F}$ as in the forward cross moment --- a pleasing and non-accidental
+coincidence: the filter ``sees'' jump history through exactly the channel the
+cross-covariance diagnostic measures.)
+
+$\Sigma_{YY}$ stacks the full Theorem~\ref{thm:moments} moment set on the
+chosen window.
+
+\section{Model, hybrid, and the PSD guardrail}
+
+Three ways to fill $(\Sigma_{XY},\Sigma_{YY})$:
+\begin{enumerate}
+\item \textbf{Pure model}: both from $\hat\Theta'$. Internally consistent;
+optimal if $\mathcal{M}'$ is right; still misspecification-fragile.
+\item \textbf{Hybrid}: $\Sigma_{XY}$ from the model, $\Sigma_{YY}$
+empirical with Ledoit--Wolf shrinkage. Robust to residual $\Sigma_{YY}$
+misspecification; the pragmatic default. \emph{Guardrail}: the stitched
+joint matrix
+$\bigl(\begin{smallmatrix}\Sigma_{XX}&\Sigma_{XY}\\ \Sigma_{YX}&\Sigma_{YY}\end{smallmatrix}\bigr)$
+is not automatically PSD; check its smallest eigenvalue, and if negative,
+shrink $\Sigma_{XY}\to\alpha\Sigma_{XY}$ with the largest
+$\alpha\in(0,1]$ restoring PSD (report $\alpha$; $\alpha\ll1$ is itself a
+misspecification alarm). Also verify the implied
+$\text{MSE}$ matrix is PSD --- same check, same fix.
+\item \textbf{Comparison as deliverable}: run both on simulated data from
+$\mathcal{M}'$ (where the latent truth is known) and report state-recovery
+RMSE. Under Step A's $\hat\Theta$ the pure-model filter is provably leaving
+information on the table; \emph{quantifying} that gap is a genuinely
+interesting result and directly showcases the misspecification-cost theme
+of the write-up.
+\end{enumerate}
+
+\begin{impact}
+Filter outputs $(\hat\Vc_{t},\hat\Vj_{t})$ are the state variables for
+everything in Chapter~\ref{ch:vrp}. Their quality ceiling is set by the
+covariances \eqref{eq:sigmaxy}; those are trustworthy only if the moment
+formulas behind them survived (i) simulation verification
+(Chapter~\ref{ch:impl}) and (ii) the over-identification tests of
+Chapter~\ref{ch:gmm}. This dependency chain is why estimation rigor comes
+before any VRP claim.
+\end{impact}
+
+% ===========================================================================
+\chapter{The variance risk premium and regime classification}
+\label{ch:vrp}
+
+\section{Physical-measure forecasts in closed form}
+
+Total quadratic variation over a horizon $\tau$ (in days) is
+$\QV_{t,t+\tau}=\int_{t}^{t+\tau}(\Vc+\Vj)\dd s+\int\!\!\int h^{2}\dd\mu$.
+Using the conditional means (Theorem~\ref{thm:effective} and its CIR
+analogue) and Lemma~\ref{lem:firstmoment}, with
+$\tilde\tau(a):=\big(1-e^{-a\tau}\big)/a$:
+\begin{equation}\label{eq:pforecast}
+\boxed{\;
+\E^{\mathbb{P}}_{t}\big[\QV_{t,t+\tau}\big]
+=\underbrace{\big(\bar V^{c}+\bar v+A\big)\tau}_{\text{unconditional level}}
++\big(\Vc_{t}-\bar V^{c}\big)\,\tilde\tau(\kappa_{c})
++\big(1+\psi\big)\big(\Vj_{t}-\bar v\big)\,\tilde\tau(\kappa_{j}) . \;}
+\end{equation}
+Two structural remarks. First, the jump-energy term enters through
+$\E_{t}\int\lambda\,\mh$, and since $\lambda$ is affine in $\Vj$ it
+\emph{adds} $\psi$ to the loading on the jump state: elevated jump variance
+predicts future variance twice --- through its own decay \emph{and} through
+the extra jumps it will cause. Second, the loading decays with
+$\tilde\tau(\kappa_{j})$: for a 30-day horizon and a persistent
+$\kappa_{j}$, jump-state shocks move even month-ahead expected variance
+materially. Both effects are absent from the Step-A model. In practice,
+plug the filtered $(\hat\Vc_{t},\hat\Vj_{t})$ into \eqref{eq:pforecast}.
+
+\section{The premium is affine in the states}
+
+Under a standard affine change of measure (intensity scaling
+$\lambda^{\mathbb{Q}}=\ell\,\lambda$, mark tilting
+$G^{\mathbb{Q}}$, and drift adjustments to $\Vc$), the
+$\mathbb{Q}$-expectation of $\QV$ has the \emph{same functional form} as
+\eqref{eq:pforecast} with risk-adjusted coefficients. Hence
+\begin{equation}\label{eq:vrpaffine}
+\mathrm{VRP}_{t}(\tau)
+:=\E^{\mathbb{Q}}_{t}[\QV_{t,t+\tau}]-\E^{\mathbb{P}}_{t}[\QV_{t,t+\tau}]
+=\alpha_{0}(\tau)+\alpha_{c}(\tau)\,\Vc_{t}+\alpha_{j}(\tau)\,\Vj_{t} :
+\end{equation}
+\emph{the variance risk premium is an affine function of the two latent
+states.} This is the theoretical license for the entire classification
+program: states of the VRP \emph{are} regions of the
+$(\Vc,\Vj)$-plane, so classifying filtered states classifies the premium.
+
+\paragraph{Getting the $\mathbb{Q}$-side without an option-pricing model.}
+The clean two-step exploits \eqref{eq:vrpaffine}: obtain a model-free
+$\mathbb{Q}$-expected variance from the options market (Deribit DVOL$^{2}$,
+30-day), then regress it on the filtered states:
+\[
+\mathrm{DVOL}^{2}_{t}\cdot\tfrac{30}{365}
+=\beta_{0}+\beta_{c}\hat\Vc_{t}+\beta_{j}\hat\Vj_{t}+\varepsilon_{t}.
+\]
+The theory says this linear regression is correctly specified (the
+projection coincides with the structural relation up to filter error), so
+$\hat\beta-$(the $\mathbb{P}$-coefficients from \eqref{eq:pforecast})
+estimates the $\alpha(\tau)$'s directly. No parametric option model, no
+risk-price calibration: honest, simple, and defensible in an interview.
+Expected sign restrictions ($\beta_{j}$ exceeding the physical loading
+$(1+\psi)\tilde\tau(\kappa_j)$, i.e.\ $\alpha_j>0$: jump risk carries a
+premium) become testable hypotheses --- report them.
+
+\section{Regimes and stability, made precise}
+
+The affine structure tells you \emph{which} features are sufficient and
+\emph{what stability means}:
+\begin{itemize}
+\item \textbf{Features.} The jump share $\hat\Vj_{t}/(\hat\Vc_{t}+\hat\Vj_{t})$
+and the total level $\hat\Vc_{t}+\hat\Vj_{t}$ span the state plane; by
+\eqref{eq:vrpaffine} any VRP regime is a half-plane-ish region in these
+coordinates. Add the \emph{intensity innovation}
+$\JV_{t}-\E[\JV_{t}\mid\text{history}]
+=\JV_{t}-\big(A+\psi\,(\widehat{\Vj\text{-path}}-\bar v)\text{-term}\big)$:
+under $\mathcal{M}'$ it is white, so its running size is a real-time
+misspecification/stress alarm --- clustering that even the Hawkes term
+cannot absorb.
+\item \textbf{Classification.} Start with transparent thresholds on
+(jump share, level); add a 2--3 state HMM on logs as a comparison; select
+state count by held-out likelihood, not in-sample BIC alone (545 daily
+observations). Validate against the known event: 2025-10-10 must be flagged
+without being told.
+\item \textbf{Stability metrics with model meaning.} (i) Regime persistence
+compares directly to the structural half-lives $\ln2/\kappa_{c}$,
+$\ln2/\kappa_{j}$: a ``regime'' shorter than the states' own relaxation
+times is noise, not regime. (ii) The branching ratio $\eta$ is a
+\emph{global} fragility dial: as $\eta\to1$ the system approaches
+criticality --- variance of $\Vj$ and cluster sizes diverge. Reporting
+$\hat\eta$ with a bootstrap CI, and tracking it over subsamples
+(2025 vs 2026), turns ``stability of the VRP'' from a vibe into a
+parameter. (iii) Posterior entropy of the HMM gives a day-by-day
+uncertainty measure; spikes flag transitions.
+\end{itemize}
+
+\begin{impact}
+Deliverables enabled by this chapter, in order: the VRP time series
+\eqref{eq:vrpaffine} on real data (needs the DVOL leg); regime-shaded charts
+of VRP and jump share; the $\hat\eta$ criticality dial with CIs; an event
+study around 2025-10-10 (VRP spike and decay at rate $\kappa_{j}$ ---
+a directly testable model prediction: the post-event decay slope in the
+data \emph{should} match the GMM-estimated $\kappa_{j}$; verifying it on
+an event not targeted by any moment is the strongest single validation
+this project can produce).
+\end{impact}
+
+% ===========================================================================
+\chapter{Implementation: simulation, verification, and code changes}
+\label{ch:impl}
+
+\section{Exact simulation (no discretization)}
+
+Two exact schemes; implement the first, keep the second as cross-check.
+
+\paragraph{Ogata thinning.} Between jumps, $\lambda(t)$ decays
+deterministically: from state $\Vj(\tau_{i})$,
+$\lambda(t)=\lambda_{0}+\lambda_{1}\Vj(\tau_{i})e^{-b(t-\tau_{i})}$, which is
+bounded by its left value. Iterate: (1) set
+$\bar\lambda_{\text{loc}}=\lambda(\tau_{i}^{+})$; (2) propose the next event
+after an $\mathrm{Exp}(\bar\lambda_{\text{loc}})$ wait; (3) accept with
+probability $\lambda(\text{proposed time})/\bar\lambda_{\text{loc}}$
+(the decayed, hence smaller, true rate); if rejected, update the bound and
+repeat; (4) on acceptance draw $x\sim G$, add $k(x)$ to $\Vj$, record
+$h^{2}(x)$. This is exact for monotone-between-jumps intensities. Simulate
+$\Vc$ with the standard exact CIR transition (noncentral $\chi^{2}$) on a
+fine grid; form daily $\TPV$, $\JV$ by integrating/aggregating.
+
+\paragraph{Cluster construction.} Draw immigrants as Poisson($\lambda_{0}$)
+on $[0,T]$; recursively give each event $\mathrm{Poisson}(\lambda_{1}k(x)/b)$
+children with ages $\sim\mathrm{Exp}(b)$; stop when a generation is empty
+(a.s.\ finite by $\eta<1$). Statistically identical output, independent code
+path --- ideal for catching bugs in either.
+
+\section{The verification protocol (non-negotiable)}
+
+Before the first GMM run on real data:
+\begin{enumerate}
+\item Fix a test parameter point with meaningful self-excitation
+(e.g.\ $\eta\approx0.6$, $\kappa_{j}$ half-life $\approx4$ d, $b$ half-life
+$\approx0.3$ d).
+\item Simulate $\ge2\times10^{5}$ days; compute all 40 empirical moments.
+\item Compare against Theorem~\ref{thm:moments} with batch-means Monte Carlo
+error bands; every formula must land inside its band. Repeat at
+$\lambda_{1}=0$ and confirm collapse to the Step-A formulas
+(Corollary~\ref{cor:nesting}).
+\item Verify the analytic Jacobian against finite differences at random
+interior points (max relative error $<10^{-6}$ at sensible step sizes).
+\item Only then: run GMM on simulated data and confirm parameter recovery
+(estimates within bootstrap bands of truth). This end-to-end rehearsal is
+also Figure~1 of the write-up's appendix: ``the estimator works when the
+model is true.''
+\end{enumerate}
+
+\section{Concrete changes to the codebase}
+
+\begin{center}
+\small
+\begin{tabular}{lll}
+\toprule
+component & Step A (\texttt{test.py}) & Step A$'$\\
+\midrule
+data engineering & 5-min bars & 1-min bars (signature-justified)\\
+jump-robust estimator & tripower, $\min(\cdot,\RV)$ cap & same, add MedRV cross-check\\
+\texttt{theoretical\_moments} & 20 moments, 8 params & 40 moments, 9 params ($\Theta'$)\\
+damping functions & $f,g$ & $f,g,\hat g$ and derivatives\\
+weighting & Ledoit--Wolf + ridge & unchanged (more shrinkage)\\
+bounds & $\kappa_c$ band, $\rho_j$ band & $\kappa_c$ band, positivity, $b\ge\ln2/2$\\
+new module & --- & simulator + moment verifier\\
+new outputs & 3 fit plots & + $\JV$-acov and two-sided cross fits,\\
+& & tests $C_JS=C_BC_F$, strict gauge\\
+filter (Step B) & --- & $\Sigma_{XY}$ \eqref{eq:sigmaxy}; hybrid $\Sigma_{YY}$; PSD guard\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Table~\ref{tab:dictionary} is the parameter dictionary; keep it in the
+repository documentation and in docstrings (the coding standard requires
+each code block to cite its SDE equivalent --- cite equations of this
+document by number).
+
+\begin{table}[h]
+\centering
+\caption{Dictionary: Step-A parameters vs.\ Step-A$'$ composites.}
+\label{tab:dictionary}
+\begin{tabular}{lll}
+\toprule
+Step A & Step A$'$ & note\\
+\midrule
+$\mathcal{I}_{h^2}$ & $A=\bar\lambda\mh$ & $=\E[\JV]$\\
+$\mathcal{I}_{h^4}$ & $B=\bar\lambda\mhh$ & $=\Var(M)$ level\\
+$\mathcal{I}_{kh^2}$ & $cB=\bar\lambda\mkh$ & cross asymmetry $C_F-C_B$\\
+$\Var(V^j)$ & $S$ & free under relaxed gauge\\
+$-\rho_{j}$ & $b=\kappa_{j}+\psi c$ & microscopic decay (transient)\\
+--- & $\kappa_{j}=b(1-\eta)$ & macroscopic decay (persistent)\\
+--- & $\psi=\lambda_{1}\mh$, $\eta=\psi c/b$ & self-excitation strength\\
+$\kappa_{c},\ \sigma_{c}^{2}$, level & unchanged & CIR block untouched\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+% ===========================================================================
+\appendix
+
+\chapter{Damping functions and derivatives (for the analytic Jacobian)}
+\label{app:derivatives}
+
+With $E:=e^{-a}$ (evaluate $1-E$ as \texttt{-expm1(-a)} and
+$a-1+E$ as \texttt{a + expm1(-a)}):
+\begin{align*}
+f(a)&=\frac{2(a-1+E)}{a^{2}}, &
+f'(a)&=\frac{2(1-E)}{a^{2}}-\frac{4(a-1+E)}{a^{3}},\\
+\hat g(a)&=\frac{1-E}{a}, &
+\hat g'(a)&=\frac{E}{a}-\frac{1-E}{a^{2}},\\
+g(a)&=\hat g(a)^{2}, &
+g'(a)&=2\,\hat g(a)\,\hat g'(a) .
+\end{align*}
+Small-$a$ limits (useful as unit tests): $f(a)\to1-\tfrac{a}{3}$,
+$\hat g(a)\to1-\tfrac{a}{2}$, $g(a)\to1-a$. Large-$a$:
+$f\sim2/a$, $\hat g\sim1/a$, $g\sim1/a^{2}$. Lagged terms: for
+$m(a)=g(a)e^{-a(k-1)}$, $m'(a)=\big[g'(a)-(k-1)g(a)\big]e^{-a(k-1)}$, and
+analogously with $\hat g$ and lag $k$ ($\hat m'=[\hat g'-k\hat g]e^{-ak}$).
+Derived-parameter chain rules: with $b=\kappa_{j}+\psi c$,
+$\partial b/\partial\kappa_{j}=1$, $\partial b/\partial\psi=c$,
+$\partial b/\partial c=\psi$; with $\bar v=cA/b$,
+$\partial\bar v = \big(A/b,\ cA\,\partial(1/b)\big)$ componentwise.
+
+\chapter{Useful integrals}
+\label{app:integrals}
+For $a>0$, $k\ge1$ integer:
+\[
+\int_{0}^{1}\!\!\int_{0}^{1}e^{-a|u-w|}\dd u\dd w=f(a),\qquad
+\int_{k}^{k+1}\!\!\int_{0}^{1}e^{-a(s-u)}\dd u\dd s=g(a)e^{-a(k-1)},
+\]
+\[
+\int_{0}^{1}\!\!\int_{0}^{s}e^{-a(s-u)}\dd u\dd s=\tfrac{1}{2}f(a),\qquad
+\int_{k}^{k+1}e^{-as}\dd s=\hat g(a)e^{-ak},\qquad
+\int_{0}^{\tau}e^{-as}\dd s=\tilde\tau(a)=\frac{1-e^{-a\tau}}{a}.
+\]
+The triangle integral (third) is exactly half the square integral (first):
+the geometric reason the contemporaneous cross moment carries $f/2$ where
+the variance carries $f$.
+
+\chapter{Notation glossary}
+\label{app:notation}
+\begin{center}
+\begin{tabular}{ll}
+\toprule
+$\mu,\ \tilde\mu,\ \nu$ & jump counting measure, compensated measure, compensator\\
+$G,\ m_{\phi}$ & mark distribution (probability); $m_{\phi}=\int\phi\,\dd G$\\
+$\lambda_{0},\lambda_{1},\lambda(t)$ & baseline, excitation slope, intensity $\lambda_0+\lambda_1\Vj(t^-)$\\
+$b=-\rho_{j}$ & microscopic (per-jump) decay rate of $\Vj$\\
+$\eta=\lambda_{1}\mk/b$ & branching ratio (children per jump); $\eta<1$\\
+$\kappa_{j}=b(1-\eta)$ & effective (observable) decay rate of $\Vj$\\
+$\bar\lambda,\ \bar v$ & stationary mean intensity, stationary mean of $\Vj$\\
+$S$ & $\Var(\Vj)=\bar\lambda\mkk/(2\kappa_{j})$\\
+$A,B,\psi,c$ & composites $\bar\lambda\mh$, $\bar\lambda\mhh$, $\lambda_{1}\mh$, gauge constant\\
+$C_{F},C_{B},C_{J}$ & cross-forward, cross-backward, $\JV$-acov coefficients\\
+$f,g,\hat g$ & damping trio (Lemma~\ref{lem:damping}); $g=\hat g^{2}$\\
+$M_{t},\Lambda_{t}$ & day-$t$ jump surprise, integrated intensity \eqref{eq:jvdecomp}\\
+$\mathcal{E}_{k}$ & $e^{-\kappa_{j}(k-1)}$ (and $\mathcal{E}^{c}_{k}$ with $\kappa_{c}$)\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\chapter{Implementation checklist}
+\label{app:checklist}
+\begin{enumerate}
+\item Switch data engineering to 1-minute bars; add MedRV alongside tripower;
+keep the $\TPV\le\RV$ truncation and its warning.
+\item Implement $f,g,\hat g$ + derivatives with \texttt{expm1}; unit-test
+against the small-/large-$a$ limits of Appendix~\ref{app:derivatives}.
+\item Implement \texttt{theoretical\_moments\_ext($\Theta'$)} returning the
+40-vector of Theorem~\ref{thm:moments} and its analytic $40\times9$
+Jacobian; unit-test the $\lambda_{1}=0$ collapse against the existing
+Step-A function.
+\item Build the simulator (thinning; cluster construction as cross-check);
+run the five-step verification protocol of Chapter~\ref{ch:impl}. Do not
+proceed past a failing band.
+\item Extend \texttt{empirical\_moments} to the 40-moment menu; reuse
+Ledoit--Wolf weighting with condition-number guardrails.
+\item Estimate; report $\Theta'$, derived $(b,\eta,\lambda_{0},\bar v)$ with
+block-bootstrap CIs; report the consistency tests $C_{J}S=C_{B}C_{F}$ and
+$S=c^{2}B/(2\kappa_{j})$; regenerate all three diagnostic figures with the
+new model-implied curves overlaid.
+\item Step B: assemble $\Sigma_{XY}$ from \eqref{eq:sigmaxy}, hybrid
+$\Sigma_{YY}$, PSD guardrail; simulation study comparing pure-model vs
+hybrid filters under both $\hat\Theta$ (old) and $\hat\Theta'$ (new).
+\item VRP: source DVOL; regress on filtered states per
+Chapter~\ref{ch:vrp}; build the VRP series, regimes, $\hat\eta$ dial, and
+the 2025-10-10 event study (test: post-event decay slope $=\hat\kappa_{j}$).
+\end{enumerate}
+
+\end{document}

@@ -1,0 +1,23 @@
+# raw tick data (2.9 GB) and the 1-minute file built from it
+*_btc_usd_price_index.csv
+btc_1min.csv
+
+# regenerated outputs
+figures_supporting/
+jump_compression_analysis.csv
+vrp_predictability.csv
+
+# python
+__pycache__/
+*.pyc
+.venv/
+.idea/
+
+# latex build artifacts
+*.aux
+*.log
+*.out
+*.toc
+
+# superseded code kept locally
+legacy/

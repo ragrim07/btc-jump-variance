@@ -1,0 +1,178 @@
+\documentclass[11pt]{article}
+\usepackage[margin=0.85in]{geometry}
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs}
+\usepackage{graphicx}
+\usepackage{xcolor}
+\usepackage{titlesec}
+\usepackage{enumitem}
+\usepackage[colorlinks=true,linkcolor=blue!55!black]{hyperref}
+
+\definecolor{ink}{HTML}{1A1A1A}
+\definecolor{good}{HTML}{15794F}
+\definecolor{bad}{HTML}{A8383A}
+\definecolor{muted}{HTML}{5C5A54}
+\titleformat{\section}{\normalsize\bfseries\color{ink}}{\thesection.}{0.5em}{}
+\setlength{\parskip}{4pt}
+\setlength{\parindent}{0pt}
+
+\newcommand{\JV}{\mathrm{JV}}
+\newcommand{\TPV}{\mathrm{TPV}}
+\newcommand{\code}[1]{\texttt{\small #1}}
+
+\begin{document}
+\thispagestyle{empty}
+
+{\LARGE\bfseries Self-Exciting Jump Dynamics in Bitcoin Variance}\\[3pt]
+{\large\color{muted} Do jump clusters predict when the variance risk premium compresses?}\\[8pt]
+{\color{muted}\small 1{,}838{,}880 one-minute bars, Jan 2023 -- Jun 2026 \quad$\cdot$\quad
+Deribit DVOL options data \quad$\cdot$\quad all code and derivations in repository}
+
+\vspace{6pt}\hrule\vspace{8pt}
+
+\textbf{The question.} Bitcoin's price jumps arrive in clusters, like earthquakes
+and their aftershocks. If a cluster is running, is the options market's variance
+premium about to compress? Answering that needs a latent quantity nobody
+observes --- the \emph{jump-variance state} --- so the project builds the
+machinery to extract it, verifies that machinery works, and then tests the
+trading question honestly.
+
+\section{What I found}
+
+\textbf{1. Bitcoin jumps cluster, and the standard model cannot accommodate it.}
+The textbook constant-intensity jump-diffusion predicts that jump energy on
+disjoint days is independent: the $\JV$ autocovariance is \emph{exactly zero at
+every lag, for every parameter value}. It is not.
+
+\begin{center}\small
+\begin{tabular}{lcc}
+\toprule
+model-free test & standard model predicts & data\\
+\midrule
+Jump clustering, $\mathrm{Cov}(\JV_t,\JV_{t-k})$, joint over 10 lags & $0$ & $t = \mathbf{3.05}$\\
+Diffusive variance leading future jumps, joint over 5 lags & $0$ & $t = \mathbf{2.78}$\\
+Lag-1 jump clustering alone & $0$ & $t = \mathbf{3.74}$\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\begin{center}
+\includegraphics[width=\textwidth]{FIG1_finding.png}
+\end{center}
+
+\textbf{2. A self-exciting (Hawkes) repair fits.} Letting the jump arrival rate
+depend on the jump-variance state, $\lambda(t)=\lambda_0+\lambda_1 V^j(t^-)$,
+reproduces both curves. Calibrated by GMM on 40 moments: only \textbf{2 of 40}
+moments miss by more than two standard errors --- what chance alone produces ---
+and the misses are scattered rather than concentrated in any block. Point
+estimates: about \textbf{24\%} of jumps are aftershocks of earlier jumps
+($\hat\eta = 0.24$), individual shocks decay with a 1.8-day half-life while
+\emph{clusters} persist 2.4 days.
+
+\textbf{3. Bitcoin variance carries a large risk premium.} Option-implied
+variance exceeds the model's physical expectation by \textbf{20\% on average} and
+on \textbf{65\% of days}; it exceeds subsequently realised variance by
+\textbf{25\%}. The premium mean-reverts with a \textbf{13.8-day half-life}.
+
+\textbf{4. The model still under-states persistence.} On held-out crash events,
+variance stays elevated for \textbf{9.5 days} against the model's predicted
+\textbf{2.4}. An independent over-identification test points the same way (a
+$6.3\times$ gap), so something slow is still missing --- most likely a third
+variance factor. The Hawkes repair moves the right direction but not far enough.
+
+\section{How I know the machinery is right}
+
+Before touching real data, the estimator was proved on data whose answers were
+known. An exact simulator (Ogata thinning for self-exciting jumps, noncentral
+$\chi^2$ for the CIR factor, analytic within-day integrals --- no discretisation)
+generated $\ge$50{,}000 days at six known parameter vectors.
+
+\begin{center}
+\includegraphics[width=\textwidth]{FIG2_verification.png}
+\end{center}
+
+Every analytic moment landed inside Monte-Carlo error (max $|z| = 2.64$, none of
+240 beyond $\pm3$); GMM recovered the true parameters; and 95\% bootstrap
+intervals covered at 0.86--0.98 across 50 independent datasets.
+
+\textbf{This process caught four real bugs}, each of which would have silently
+corrupted the results:
+\begin{enumerate}[nosep,leftmargin=1.4em]
+\item Tripower variation used exponent $4/3$ (quarticity) rather than $2/3$
+(variance) --- the ``jump variance'' series was really \emph{total} variance.
+Caught by cross-checking against a second robust estimator (MedRV), which now
+agrees at $\rho = 0.996$.
+\item The block bootstrap re-sliced the raw series and recomputed
+autocovariances, splicing unrelated days together. Interval coverage for
+$\kappa_c$ was $0.00$; resampling moment-contribution rows instead restored it to
+$0.93$.
+\item Shrinking the GMM weighting matrix toward a scaled identity ignored that
+moment variances span five orders of magnitude, starving the jump-clustering
+moments of weight. It had inverted the persistence estimate ($\kappa_j = 3.43$
+versus the correct $0.29$).
+\item One of the two over-identifying ``tests'' was an algebraic tautology of the
+parametrisation --- it holds for arbitrary parameters and tests nothing. It only
+has content when the coefficients are estimated freely from separate moment
+blocks, which is how it now runs.
+\end{enumerate}
+
+\newpage
+
+\section{The trading question, and the honest answer}
+
+Sorting every day by how rich the premium is \emph{and} how hot the jump state
+is produces a large, ordered in-sample effect. Holding the premium rich, a hot
+jump state compresses it roughly $20\times$ harder than a quiet one over the
+following ten days, and raises the odds of a large compression by $2.1\times$.
+
+\begin{center}
+\includegraphics[width=\textwidth]{FIG3_honest_limit.png}
+\end{center}
+
+\textbf{It does not replicate out of sample.} On one year of held-out data the
+ordering breaks, and the single cell that would support the effect contains eight
+observations. With roughly 35 independent ten-day windows, the holdout can
+neither confirm nor refute --- but it certainly did not confirm.
+
+Three further results were discarded once tested properly, each an artifact
+rather than a signal:
+\begin{itemize}[nosep,leftmargin=1.4em]
+\item The premium appeared to predict variance-selling returns at $t = 5.7$ ---
+but signal and payoff share the implied-variance leg ($\rho = 0.97$), and the
+effect vanishes once that is controlled ($t = 0.99$).
+\item The continuous-variance state appeared to predict premium changes at
+$t = 2.5$ --- but the model's forecast is built \emph{from} that state, a purely
+mechanical channel ($t = 8.5$). Against pure market data the effect is
+$t = 0.10$.
+\item The structural forecast does not beat a three-term HAR regression
+($R^2$ 0.117 versus 0.113).
+\end{itemize}
+
+\section{Method, briefly}
+
+Two latent factors drive total variance: a persistent Brownian-driven CIR
+component and a jump-driven component whose arrival intensity is affine in its
+own level, making jumps self-exciting (equivalent to a marked Hawkes process).
+Because the intensity is affine, all 40 unconditional moments --- means,
+variances, autocovariances and two-sided cross-covariances of daily tripower
+variation and jump variance --- remain in closed form, and are matched to their
+sample analogues by GMM with an analytic $40\times9$ Jacobian, Ledoit--Wolf
+regularised weighting, and moving-block bootstrap intervals. Parameters are
+estimated on 2023-01 to 2025-06 only; 2025-07 onward, containing the October 2025
+crash, is never used in estimation.
+
+\section{What I would do next}
+
+The persistence shortfall (9.5 days observed against 2.4 predicted) and the
+$6.3\times$ over-identification gap point at the same omission, so the natural
+extension is a third, slower variance factor. Separately, the compression result
+needs more held-out data than one year to be settled; the sample, not the method,
+is the binding constraint.
+
+\vspace{8pt}\hrule\vspace{6pt}
+{\small\color{muted}
+Reproduce everything with \code{python run\_all.py}. Full derivations in
+\code{docs/affine\_intensity\_theory.pdf}; estimator verification in
+\code{docs/estimation\_verification\_report.pdf}.}
+
+\end{document}
