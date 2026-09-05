@@ -76,6 +76,18 @@ latent-state filter, the variance risk premium, and the simulator I need to
 check the algebra against before running anything on real data.
 \end{abstract}
 
+\paragraph{What this document is.} These are the notes I wrote while working the
+extension out, before I implemented any of it, so they read as much like a plan as a
+derivation. The later chapters propose more than I ended up building: the latent-state
+filter of Chapter~\ref{ch:filter} and the regime classification in Chapter~\ref{ch:vrp}
+were never written. The repository README and \texttt{writeup.pdf} record what actually
+happened, and two things there went against what I predict below. The event-study
+prediction, that post-event decay should match the estimated $\kappa_{j}$, failed:
+observed persistence was about 9.5 days against a predicted 2.4. And the branching ratio
+$\eta$ came out statistically indistinguishable from zero, so the jump clustering itself
+is on much firmer ground than the structural parameter that decomposes it. The
+derivations I did check, against an exact simulator, before using any of them.
+
 \tableofcontents
 
 % ===========================================================================
@@ -139,8 +151,8 @@ fixed intervals, each ending in a boxed formula. Chapter~\ref{ch:gmm} treats
 identification and the GMM design. Chapter~\ref{ch:filter} rebuilds the
 latent-state projection. Chapter~\ref{ch:vrp} connects the calibrated
 physical dynamics to the variance risk premium and regime classification.
-Chapter~\ref{ch:impl} specifies simulation, verification, and the concrete
-changes to \texttt{test.py}. Appendices collect derivatives for the analytic
+Chapter~\ref{ch:impl} specifies simulation, verification, and the changes
+needed to the existing estimation code. Appendices collect derivatives for the analytic
 Jacobian, useful integrals, notation, and an implementation checklist.
 
 \paragraph{How the derivations run.} Throughout, I work through \emph{Dynkin's formula evaluated over a fixed
@@ -1056,8 +1068,8 @@ misspecification/stress alarm --- clustering that even the Hawkes term
 cannot absorb.
 \item \textbf{Classification.} Start with transparent thresholds on
 (jump share, level); add a 2--3 state HMM on logs as a comparison; select
-state count by held-out likelihood, not in-sample BIC alone (545 daily
-observations). Validate against the known event: 2025-10-10 must be flagged
+state count by held-out likelihood, not in-sample BIC alone, given how few
+daily observations there are. Validate against the known event: 2025-10-10 must be flagged
 without being told.
 \item \textbf{Stability metrics with model meaning.} (i) Regime persistence
 compares directly to the structural half-lives $\ln2/\kappa_{c}$,
@@ -1079,6 +1091,8 @@ study around 2025-10-10 (VRP spike and decay at rate $\kappa_{j}$ ---
 a directly testable model prediction: the post-event decay slope in the
 data \emph{should} match the GMM-estimated $\kappa_{j}$; verifying it on
 an event no moment was fitted to is the strongest check available here).
+\emph{This is the prediction that failed when I ran it: observed persistence
+was about 9.5 days against the 2.4 the fitted $\kappa_{j}$ implies.}
 \end{impact}
 
 % ===========================================================================
@@ -1134,13 +1148,13 @@ model is true.''
 \small
 \begin{tabular}{lll}
 \toprule
-component & Step A (\texttt{test.py}) & Step A$'$\\
+component & Step A & Step A$'$\\
 \midrule
 data engineering & 5-min bars & 1-min bars (signature-justified)\\
 jump-robust estimator & tripower, $\min(\cdot,\RV)$ cap & same, add MedRV cross-check\\
 \texttt{theoretical\_moments} & 20 moments, 8 params & 40 moments, 9 params ($\Theta'$)\\
 damping functions & $f,g$ & $f,g,\hat g$ and derivatives\\
-weighting & Ledoit--Wolf + ridge & unchanged (more shrinkage)\\
+weighting & Ledoit--Wolf + ridge & shrink to \emph{diagonal}, not identity\\
 bounds & $\kappa_c$ band, $\rho_j$ band & $\kappa_c$ band, positivity, $b\ge\ln2/2$\\
 new module & --- & simulator + moment verifier\\
 new outputs & 3 fit plots & + $\JV$-acov and two-sided cross fits,\\
@@ -1150,10 +1164,9 @@ filter (Step B) & --- & $\Sigma_{XY}$ \eqref{eq:sigmaxy}; hybrid $\Sigma_{YY}$; 
 \end{tabular}
 \end{center}
 
-Table~\ref{tab:dictionary} is the parameter dictionary; keep it in the
-repository documentation and in docstrings (the coding standard requires
-each code block to cite its SDE equivalent --- cite equations of this
-document by number).
+Table~\ref{tab:dictionary} is the parameter dictionary. I keep it in the
+repository docs and in the docstrings, with each block citing the equation
+number it comes from.
 
 \begin{table}[h]
 \centering
