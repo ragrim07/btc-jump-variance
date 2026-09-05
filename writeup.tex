@@ -92,9 +92,10 @@ right way but not nearly far enough.
 
 \section{Checking the machinery before I used it}
 
-This is where most of the time went. The 40 moments are formulas I derived by
-hand, and if one of them is wrong then everything downstream is quietly wrong
-with it, in a way that no amount of staring at the output would reveal.
+This is where most of the time went. The 40 moments are closed-form expressions the
+model implies, and if I get any one of them wrong then everything downstream is
+quietly wrong with it, in a way that no amount of staring at the output would
+reveal.
 
 So before running anything on real data I wrote an exact simulator: Ogata
 thinning for the self-exciting jumps, the noncentral $\chi^2$ transition for the

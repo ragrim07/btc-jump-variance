@@ -60,8 +60,8 @@ Hawkes extension moves in the right direction but not far enough.
 
 ## Checking the machinery before using it
 
-This is the part I spent the most time on. The moments are 40 formulas I derived by hand,
-and if any of them is wrong, everything downstream is quietly garbage.
+This is the part I spent the most time on. The model implies 40 closed-form moments,
+and if I get any one of them wrong then everything downstream is quietly garbage.
 
 So before running anything on real data I wrote an exact simulator (Ogata thinning for the
 self-exciting jumps, noncentral chi-squared for the CIR factor, analytic integrals within
@@ -156,7 +156,8 @@ are, so everything except the first two stages runs from a fresh clone. Seeds ar
 | `vrp*.py`, `jump_state_compression.py` | the variance risk premium work |
 | `today.py` | current state readout |
 
-`docs/affine_intensity_theory.pdf` is where I worked out the theory and derived the moments.
+`docs/affine_intensity_theory.pdf` is the theory I worked from: the affine-intensity
+extension of Todorov's model and the moments it implies.
 `writeup.pdf` is the short version with the results.
 
 ## What I'd do next
