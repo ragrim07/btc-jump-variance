@@ -1,8 +1,13 @@
 # Bitcoin jump clustering and the variance risk premium
 
+> **TL;DR:** Bitcoin jumps cluster, and a self-exciting model captures dependence that standard jump-diffusions cannot.  
+> The variance risk premium is large and persistent, but the apparent link between jump activity and premium compression is largely in-sample.  
+> The headline compression signal does **not** survive the holdout, so there is no convincing evidence yet that jump activity predicts the VRP.  
+> The model's biggest finding may be what it misses: variance persists ~9.5 days vs. 2.4 predicted, pointing to a missing slow factor.
+
 I started this with a question I couldn't answer from reading alone: Bitcoin's price jumps
-clearly arrive in bunches rather than evenly, so if a bunch is happening right now, does
-that tell you anything about whether options are about to get cheaper?
+clearly arrive in bunches rather than evenly, so if jump activity is high right now, does
+that tell you anything about the future behaviour of the variance risk premium?
 
 Answering it needs a quantity you can't observe directly (how "agitated" the jump process
 currently is), so most of this repo is the machinery to estimate that, plus the checks I
