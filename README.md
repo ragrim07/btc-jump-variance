@@ -172,3 +172,13 @@ over-identification gap both point at the same missing piece, so a third slower 
 factor is the obvious extension. The compression result needs more than one year of
 held-out data before it means anything either way. At this point the sample size is the
 constraint, not the method.
+
+## License      
+
+Code is MIT (see [LICENSE](LICENSE)).    
+
+The written work, meaning `docs/affine_intensity_theory.pdf`, `writeup.pdf`                                                                                        and the figures, is CC BY 4.0: reuse it with attribution. 
+
+The CSV files are derived from Deribit's public API and from exchange tick
+data, so they aren't mine to license. They're included only so the results
+reproduce, and the original terms apply.
